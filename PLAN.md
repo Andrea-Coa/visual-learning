@@ -68,6 +68,7 @@ visual-learning/
   > note: installed in `.venv` (Python 3.13, torch 2.15 CPU, openTSNE 1.0.4) without issues.
 - [x] 0.3 Colab notebook skeleton that installs deps, mounts Drive, and runs `pipeline/train.py`.
   > note: `notebooks/colab_train.ipynb`; no installs needed (Colab ships torch/torchvision/scipy). Not yet run on Colab.
+  > The notebook clones/pulls the GitHub repo (code) and writes outputs to Drive `MyDrive/visual-learning/raw/`. Push code changes before training.
 
 ## Phase 1 — Data & models
 

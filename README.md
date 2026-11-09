@@ -43,25 +43,36 @@ As in the paper (Sec. 4), with plain SGD (lr 0.01, momentum 0.9, Keras-style lr 
 
 ### Option A: Google Colab (recommended, T4 GPU)
 
-1. **Upload the code to Drive.** Copy the project folder to `MyDrive/visual-learning/`. Only `pipeline/` and
-   `notebooks/` are needed (don't upload `.venv/`).
-2. **Open the notebook.** In Drive, open `notebooks/colab_train.ipynb` with Google Colab.
+The code comes from GitHub (`https://github.com/Andrea-Coa/visual-learning`, public, so no token needed). Only the
+**outputs** go to Google Drive, so they survive disconnects.
+
+1. **Push your changes.** Colab trains whatever is on `master` on GitHub, so push any local changes to `pipeline/` first.
+2. **Open the notebook in Colab.** Go to `File > Open notebook > GitHub`, paste the repo URL and pick
+   `notebooks/colab_train.ipynb`. Or open
+   `https://colab.research.google.com/github/Andrea-Coa/visual-learning/blob/master/notebooks/colab_train.ipynb`.
 3. **Select the GPU.** `Runtime > Change runtime type > T4 GPU`.
-4. **Configure.** In the second code cell check `PROJECT` (the Drive folder from step 1). In the third, choose
-   which `DATASETS` / `MODELS` this account trains (default: all six configurations).
-5. **Run all cells.** The notebook:
-   - mounts Drive and `cd`s into the project,
+4. **Configure.** In the configuration cell, choose which `DATASETS` / `MODELS` this account trains
+   (default: all six configurations).
+5. **Run all cells** (`Runtime > Run all`, and accept the Drive permission prompt). The notebook:
+   - clones the repo to `/content/visual-learning` (or `git pull`s it if it's already there) and `cd`s into it,
+   - mounts Drive; outputs go to `MyDrive/visual-learning/raw/`, datasets to the local `/content/data`,
    - runs an optional ~1 minute smoke test,
-   - trains: `python -m pipeline.train --dataset ... --model ... --data-dir /content/data --out <PROJECT>/raw`,
+   - trains: `python -m pipeline.train --dataset ... --model ... --data-dir /content/data --out <Drive>/raw`,
    - prints a summary of final accuracies next to the paper's.
-6. **If Colab disconnects**, reconnect and run all cells again. Finished configurations are skipped and
-   interrupted ones resume from the last completed epoch (outputs live on Drive).
-7. **Download the results.** Download `MyDrive/visual-learning/raw/` and place it as `raw/` in the local project.
+6. **If Colab disconnects**, reconnect and run all cells again. The code is cloned again and the outputs on Drive
+   are kept, so finished configurations are skipped and interrupted ones resume from the last completed epoch.
+7. **Download the results.** Download `MyDrive/visual-learning/raw/` from Drive and put it as `raw/` in the local
+   project root. `raw/` is git-ignored: the outputs are too large for the repo.
+
+Changes made to the notebook inside Colab are not saved to the repo. Edit `notebooks/colab_train.ipynb` locally
+and push, or use `File > Save a copy in GitHub`.
 
 #### Splitting the work across several Colab accounts
 
-Every configuration writes only to its own folder `raw/<dataset>/<model>/`, and the subset is identical everywhere
-(fixed seed). So each account can train a different part. Merge them by copying the folders into one local `raw/`.
+Every account opens the same notebook from GitHub and writes to its own Drive. Every configuration writes only to
+its own folder `raw/<dataset>/<model>/`, and the subset is identical everywhere (fixed seed). So each account can
+train a different part (set `DATASETS` in the configuration cell). Merge them by copying every account's
+`raw/<dataset>/` folders into one local `raw/`.
 
 | Account | `DATASETS` | `MODELS` | Estimated time |
 |---|---|---|---|
@@ -74,6 +85,8 @@ Every configuration writes only to its own folder `raw/<dataset>/<model>/`, and 
 ### Option B: locally
 
 ```bash
+git clone https://github.com/Andrea-Coa/visual-learning.git
+cd visual-learning
 python -m venv .venv
 .venv/Scripts/activate          # Windows (Linux/macOS: source .venv/bin/activate)
 pip install -r requirements.txt
