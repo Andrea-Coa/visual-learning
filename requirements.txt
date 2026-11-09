@@ -1,0 +1,18 @@
+# Local environment. Colab already ships torch, torchvision, numpy and scipy.
+
+# Training (phase 1-2)
+torch>=2.2
+torchvision>=0.17
+numpy>=1.26
+scipy>=1.11          # torchvision needs it to read the SVHN .mat files
+
+# Projections and trail bundling (phase 3-5)
+scikit-learn>=1.4
+openTSNE>=1.0
+pillow>=10.0
+
+# Web app (phase 6-7)
+flask>=3.0
+
+# Reading the paper PDF
+pymupdf>=1.24

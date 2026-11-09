@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Downloaded datasets and raw training outputs (large)
+/data/
+/raw/
