@@ -34,6 +34,11 @@ As in the paper (Sec. 4), with plain SGD (lr 0.01, momentum 0.9, Keras-style lr 
 | MLP | 4 × Dense(1000, ReLU), dropout 0.2/0.3/0.4/0.5 → softmax | `h1`, `h2`, `h3`, `h4` (1000 each) | 16 |
 | CNN | [conv32 conv32 pool] → [conv64 conv64 pool] → Dense(512) → softmax; dropout 0.25/0.25/0.5 | `conv1` (6272 / 8192), `conv2` (3136 / 4096), `fc` (512) | 32 |
 
+- **Deviation from the paper:** the SVHN and CIFAR-10 MLPs use **lr 0.001**. With lr 0.01 they diverged on Colab:
+  SVHN MLP test accuracy peaked at 44% after epoch 1, then collapsed to predicting one class (~20%), and the loss
+  became NaN at epoch 14. In a local 4-epoch check, lr 0.001 kept improving (SVHN 64% → 68% in two epochs).
+  Scaling pixels to [0, 1] instead of standardizing them did not help (it collapsed in epoch 1). Set in
+  `TRAINING_OVERRIDES` in `pipeline/config.py`.
 - 50 epochs per configuration (paper: 100). Activations are snapshotted at epochs
   `0, 1, 2, 3, 5, 8, 12, 18, 25, 35, 50` (epoch 0 = untrained), more often early because that's when representations change most.
 - The subset is 1000 test images, 100 per class, chosen with a fixed seed: the same images in every
@@ -63,6 +68,13 @@ The code comes from GitHub (`https://github.com/Andrea-Coa/visual-learning`, pub
    are kept, so finished configurations are skipped and interrupted ones resume from the last completed epoch.
 7. **Download the results.** Download `MyDrive/visual-learning/raw/` from Drive and put it as `raw/` in the local
    project root. `raw/` is git-ignored: the outputs are too large for the repo.
+
+8. **If a configuration diverges** (the log prints `FAILED: Training loss diverged`), the run continues with the
+   other configurations. Its folder on Drive keeps the diverged checkpoint, so it must be retrained from scratch.
+   Fix the cause (e.g. its learning rate in `pipeline/config.py`), push, and then either delete
+   `MyDrive/visual-learning/raw/<dataset>/<model>/` in Drive and run all cells again, or run this in a new cell:
+   `!python -m pipeline.train --dataset <dataset> --model <model> --restart --data-dir {DATA} --out {OUT}`.
+   `--restart` deletes the previous outputs of every selected configuration, so name only the failed one.
 
 Changes made to the notebook inside Colab are not saved to the repo. Edit `notebooks/colab_train.ipynb` locally
 and push, or use `File > Save a copy in GitHub`.

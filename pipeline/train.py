@@ -137,7 +137,7 @@ def epoch_record(epoch: int, model, data: ImageData, optimizer, running=(None, N
 
 def run_config(dataset: str, model_name: str, data: ImageData, subset_idx: torch.Tensor,
                args: argparse.Namespace, device: torch.device) -> None:
-    spec, hp = config.DATASETS[dataset], config.TRAINING[model_name]
+    spec, hp = config.DATASETS[dataset], config.training_spec(dataset, model_name)
     epochs = args.epochs or hp.epochs
     snapshot_epochs = config.snapshot_schedule(epochs)
     out_dir = args.out / dataset / model_name
@@ -260,6 +260,7 @@ def main() -> None:
     else:
         print("Device: CPU (training will be slow; use Colab for the full runs)")
 
+    failed = []
     for dataset in args.dataset:
         spec = config.DATASETS[dataset]
         pending = [m for m in args.model
@@ -278,11 +279,20 @@ def main() -> None:
         subset_idx = torch.as_tensor(subset, device=device)
 
         for model_name in pending:
-            run_config(dataset, model_name, data, subset_idx, args, device)
+            try:
+                run_config(dataset, model_name, data, subset_idx, args, device)
+            except FloatingPointError as err:
+                # Keep going with the other configurations; the checkpoint holds the diverged state,
+                # so this one must be retrained from scratch.
+                failed.append(f"{dataset}/{model_name}")
+                print(f"[{dataset}/{model_name}] FAILED: {err} Retrain it with --restart.", flush=True)
 
         del data
         if device.type == "cuda":
             torch.cuda.empty_cache()
+
+    if failed:
+        raise SystemExit(f"Diverged configurations: {', '.join(failed)}")
 
 
 if __name__ == "__main__":

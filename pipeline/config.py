@@ -2,7 +2,7 @@
 
 Hyperparameters follow Rauber et al. (2017), Sec. 4.
 """
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -62,6 +62,19 @@ TRAINING: dict[str, TrainSpec] = {
     "mlp": TrainSpec(batch_size=16, decay=1e-9),
     "cnn": TrainSpec(batch_size=32, decay=1e-6),
 }
+
+# Per-(dataset, model) deviations from TRAINING. With the paper's lr = 0.01 the MLP diverges on the
+# 3072-dimensional SVHN / CIFAR-10 inputs: accuracy peaks in epoch 1, collapses to a single predicted
+# class within a few epochs and the loss ends in NaN. lr = 0.001 trains stably (see PLAN.md, 2.3).
+TRAINING_OVERRIDES: dict[tuple[str, str], dict] = {
+    ("svhn", "mlp"): {"lr": 0.001},
+    ("cifar10", "mlp"): {"lr": 0.001},
+}
+
+
+def training_spec(dataset: str, model: str) -> TrainSpec:
+    """Hyperparameters for one configuration: model defaults plus dataset-specific overrides."""
+    return replace(TRAINING[model], **TRAINING_OVERRIDES.get((dataset, model), {}))
 
 # Epochs at which subset activations are stored. Denser at the start, where
 # representations change the most. Epoch 0 = untrained network.

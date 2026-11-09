@@ -20,7 +20,7 @@ based on Rauber et al., *Visualizing the Hidden Activity of Artificial Neural Ne
 | Datasets | **MNIST, SVHN, CIFAR-10** (all three) | Grade bonus for >1 dataset; shows easy → hard progression, as in the paper. |
 | Models | **MLP** (4 ReLU hidden layers × 1000, dropout 0.2→0.5) and **CNN** (paper architecture; recorded hidden layers = flattened output of both conv blocks (`conv1`, `conv2`) + the 512-unit FC layer (`fc`)) | Same architectures as the paper (Sec. 4), so results are comparable. MLP has equal-width layers → clean inter-layer comparison. `conv2` is the paper's "4096 (or 3136)" layer. |
 | Framework | PyTorch + torchvision, trained on **Colab T4** | Free GPU; torchvision ships all three datasets. |
-| Optimizer | SGD, momentum 0.9, lr 0.01 (batch 16 MLP / 32 CNN), as in paper | Slower than Adam → more visible evolution between epochs. |
+| Optimizer | SGD, momentum 0.9, lr 0.01 (batch 16 MLP / 32 CNN), as in paper; **lr 0.001 for SVHN/CIFAR-10 MLP** | Slower than Adam → more visible evolution between epochs. lr 0.01 made the 3072-input MLPs diverge (2026-11-09). |
 | Observation subset | **1000 test images, stratified (100/class), fixed seed**, same subset for every epoch/layer | Task suggests 1000; fixed subset is required to link points across epochs/layers. |
 | Epochs & snapshots | **50 epochs**; snapshots at 0,1,2,3,5,8,12,18,25,35,50 (0 = untrained) — `pipeline/config.py` | Paper used 100; 50 keeps Colab time ~1 h. Largest changes happen in the first epochs (paper Sec. 5.4). |
 | Projection | PCA → 50 dims, then **t-SNE** (`openTSNE`) | Paper uses (Barnes-Hut) t-SNE; openTSNE supports custom initialization, needed below. |
@@ -89,8 +89,12 @@ visual-learning/
       all hidden activations (float16), predicted labels, and softmax confidence.
   > note: one file per snapshot: `raw/<ds>/<model>/snapshots/epoch_XXX.npz`. Final metrics (confusion matrix,
   > per-class P/R/F1, train/test gap, paper accuracy) in `metrics.json`; weights in `model_final.pt`. Layout in README.
-- [ ] 2.3 Train all 6 configs (3 datasets × 2 models) on Colab; compare final test accuracy with paper Table 1.
+- [~] 2.3 Train all 6 configs (3 datasets × 2 models) on Colab; compare final test accuracy with paper Table 1.
   > note: steps + time estimate in README ("Step by step: training"). Can be split across Colab accounts by dataset.
+  > note: done: MNIST MLP 98.42% (paper 98.52), MNIST CNN 99.65% (paper 99.62), ~6–8 min each on T4.
+  > note: SVHN MLP diverged with lr 0.01 (NaN at epoch 14). SVHN/CIFAR-10 MLP now use lr 0.001 (`TRAINING_OVERRIDES`
+  > in config.py), checked locally on CPU for a few epochs. Before retraining, delete Drive `raw/svhn/mlp/` (diverged checkpoint).
+  > A diverged config no longer stops the run: it is reported and the others continue.
 - [ ] 2.4 Download `raw/` from Drive into the local project root (merge folders if several accounts were used).
 
 ## Phase 3 — Projections & metrics
@@ -176,3 +180,4 @@ misclassified points drawn as **triangles colored by predicted class** (paper co
 |---|---|---|
 | 2026-11-09 | Claude | Read task + paper; wrote this plan. |
 | 2026-11-09 | Claude | Phase 0 done; Phase 1 + training code (2.1, 2.2) implemented and smoke-tested on CPU. README with Colab steps and time estimates. Next: run 2.3 on Colab. |
+| 2026-11-09 | Claude | Colab: MNIST MLP/CNN trained OK; SVHN MLP diverged. Fixed with lr 0.001 for SVHN/CIFAR-10 MLP (tested on CPU); divergence no longer aborts the whole run. |
