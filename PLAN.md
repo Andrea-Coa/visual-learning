@@ -160,6 +160,8 @@ visual-learning/
   > note: `python -m pipeline.export` (~1 min). 118 JSON + 3 PNG, **66 MB total**, largest file 2.2 MB (sprites) /
   > 1.2 MB (coords). Verified: all JSON parse, coords and trail endpoints match `raw/`, preds match snapshots,
   > probability sums 997–1003 ‰, sample-order prefixes balanced.
+  > note: re-verified 2026-11-10 from `app/data/` alone: 154 of 744 k trail-endpoint coordinates differ from
+  > `coords_tsne.json` by 1 unit (of 9999, sub-pixel) because of float rounding at quantization. Harmless; don't "fix".
 
 ## Phase 6 — Static site skeleton & deployment
 
@@ -198,7 +200,11 @@ visual-learning/
 One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds the details. [M] items first,
 [S] items after the [M] items of all panels work.
 
-- [ ] 7.1 Controls panel (§5.1): dataset, dim. red., ANN, view by, sample size, color by, bundling.
+- [x] 7.1 Controls panel (§5.1): dataset, dim. red., ANN, view by, sample size, color by, bundling.
+  > note: `js/controls.js` (`initControls`), shared tooltip + ⓘ icon helper in `js/ui.js` (reuse them in later panels).
+  > Controls only write state; `colorBy` / `bundling` have no visual effect until 7.4 / 7.8. Bundling is disabled unless
+  > `showAll` and the projection has trails. Changing dataset keeps model/projection valid (falls back to the first
+  > available). Tested in headless Chrome (interaction test in scratch, not in repo).
 - [ ] 7.2 Embeddings view, scatter mode (§5.4, §4.1–4.2): circles/triangles, title, legend filter, zoom/pan,
       brush, tooltip with thumbnail, pin; NH + sample-acc badges computed in the browser.
 - [ ] 7.3 Steppers + animation (§5.5, §6): layer/epoch rows, Play/speed on the active row, animated transitions;
@@ -249,3 +255,4 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 | 2026-11-09 | Claude | Plan revised: Flask dropped → static site in `app/` deployed on GitHub Pages (optional Flask wrapper, 8.5). Phases 6–8 rewritten; Phase 7 now one item per `VIS_PLAN.md` panel. `app/` skeleton restructured. |
 | 2026-11-09 | Claude | Phase 5 done: `pipeline/export.py` → `app/data/` (index, meta, nodes, coords per method, trails per view, sprites; 66 MB), verified, schema in README. Next: Phase 6 (site skeleton + Pages). |
 | 2026-11-09 | Claude | Phase 6 done except the first Pages deploy (6.6, needs user): layout, vendored D3 7.9.0, `data.js`, `state.js`, `main.js`, Pages workflow; Node tests + headless-Edge screenshots. Default branch is `main` (README links fixed). Next: Phase 7.1 (controls). |
+| 2026-11-10 | Claude | Full check on macOS (no `raw/`, no `.venv`): pipeline compiles, `app/data/` consistent (only ±1 rounding on trail endpoints), all 6 configs × 2 methods + trails load in Chrome. 7.1 controls panel done (`controls.js`, `ui.js`). Next: 7.2 scatter. |
