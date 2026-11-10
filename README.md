@@ -8,7 +8,12 @@ and explore their evolution with D3:
 - **T2**: evolution across **layers** (how representations change as an image flows through the network).
 
 Based on Rauber et al., *Visualizing the Hidden Activity of Artificial Neural Networks* (IEEE TVCG 2017), in `paper/`.
-The assignment is in `task-description.md`; the plan and its progress are in `PLAN.md`.
+The assignment is in `task-description.md`; the plan and its progress are in `PLAN.md`; the UI design spec is in
+`VIS_PLAN.md`; the in-class demo script is in `PRESENTATION.md`.
+
+**Live site:** <https://andrea-coa.github.io/visual-learning/> (GitHub Pages, see "Run the site").
+**Quick start (local):** `python -m http.server 8000 -d app`, or `pip install flask && python app.py`
+(<http://127.0.0.1:5000>). Everything below "Run the site" explains the site; the sections before it rebuild the data.
 
 ## Project layout
 
@@ -23,7 +28,9 @@ pipeline/                 Python pipeline (runs on Colab or locally)
   bundle.py               class-aware bundling of the t-SNE trails (entry point)
   export.py               writes the site data files to app/data/ (entry point)
 notebooks/colab_train.ipynb   runs pipeline/train.py on a Colab T4
-app/                      static D3 site, deployed on GitHub Pages (later phases)
+app/                      static D3 site (HTML/CSS/JS + app/data/ JSON), deployed on GitHub Pages
+app.py                    Flask wrapper that serves app/ (the assignment asks for a Flask app)
+package.py                builds the submission ZIP (dist/visual-learning.zip)
 raw/                      training outputs (git-ignored, large)
 data/                     downloaded datasets (git-ignored)
 ```
@@ -232,6 +239,13 @@ JSON in `app/data/`. There is no build step and no server code.
 python -m http.server 8000 -d app          # then open http://localhost:8000
 ```
 
+**With Flask** (same site; Flask only serves the folder):
+
+```bash
+pip install flask
+python app.py                              # then open http://127.0.0.1:5000
+```
+
 **GitHub Pages:** `.github/workflows/pages.yml` publishes `app/` on every push to `main` that changes `app/`,
 or on a manual run from the Actions tab.
 1. One-time setup on GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
@@ -248,11 +262,18 @@ The site lives under `/visual-learning/`, so all paths in the code are relative.
 | `state.js` | shared UI state (`VIS_PLAN.md` §3) with change notifications and the reset rules |
 | `controls.js` | controls panel (`VIS_PLAN.md` §5.1): dropdowns and sample spinner, two-way bound to the state |
 | `ui.js` | shared floating tooltip and ⓘ info icons |
-| `scatter.js` | embeddings view, scatter mode (`VIS_PLAN.md` §5.4): points, legend, zoom/pan, brush, tooltip, pin, badges |
-| `metrics.js` | neighborhood hit and sample accuracy, computed on the shown points |
+| `encoding.js` | shared encodings: class colors, color-by modes, trail progress colors, animation timing |
+| `scatter.js` | embeddings view (`VIS_PLAN.md` §5.4): points, legend, zoom/pan, brush, tooltip, pin, badges, path view, trajectory |
+| `paths.js` | trails of the path view: grouped SVG paths, draw-in, morph between bundling strengths, hit testing |
+| `metrics.js` | neighborhood hit, sample accuracy, confusion matrix, per-class recall / precision / F1 |
 | `steppers.js` | layer / epoch rows (canvas filmstrip), Play, speed, All, keyboard shortcuts (`VIS_PLAN.md` §5.5) |
+| `architecture.js` | architecture panel with the NH separation bars (`VIS_PLAN.md` §5.2) |
+| `curve.js` | learning curve with the current-epoch marker (`VIS_PLAN.md` §5.3) |
+| `model-metrics.js` | confusion matrix and per-class bars at the current epoch (`VIS_PLAN.md` §5.7) |
+| `images.js` | image view and active-filter chips (`VIS_PLAN.md` §5.6) |
+| `datapoint.js` | data point panel: softmax bars and "when was it learned?" (`VIS_PLAN.md` §5.8) |
 
-`data.js` and `state.js` use neither D3 nor the DOM, so they can be tested with Node. In the browser console,
+`data.js`, `state.js` and `metrics.js` use neither D3 nor the DOM, so they can be tested with Node. In the browser console,
 `app.store.set({ dataset: "svhn" })` changes the state by hand.
 
 ## Site data files (`app/data/`)
@@ -269,3 +290,89 @@ All JSON is compact. **Coordinates** are integers `0..9999` in the unit square, 
 | `<ds>/<model>/nodes.json` | `n`, `labels[obs]`, `testIndex[obs]` (index in the original test set), `sampleOrder` (the first 100·k ids hold 10·k per class; identical for both models), `preds[epoch][obs]`, `probs[epoch]` = flat `[obs × 10]` probabilities in per mille (`probScale` = 1000) |
 | `<ds>/<model>/coords_<method>.json` | `t1[layer][epoch]` and `t2[epoch][layer]`, each a flat point array. `epoch` indexes `meta.epochs`; `layer` names follow `t1Layers` (keys) / `t2Layers` (order) |
 | `<ds>/<model>/trails/t1_<layer>.json`, `t2_e<epoch>.json` | t-SNE only: `strengths` (`medium`, `strong`), `samplesPerSegment` (4), `trails[strength][obs]` = flat point array of the bundled trail; point `i` belongs to step `i / 4` (an epoch index for T1, a layer index for T2). Unbundled trails: join the points of `coords` directly |
+
+## Using the site
+
+| Task | How |
+|---|---|
+| **T1 (epochs)** | *View by: epoch (T1)*. Pick a layer in the Layer row, press ▶ (or Space) on the Epoch row: points move from the untrained network (epoch 0) to epoch 50. `All` shows every epoch at once as bundled trails. |
+| **T2 (layers)** | *View by: layer (T2)*, or click a box in the Architecture panel. ▶ plays Input → hidden layers → Output; the separation bars show the NH of every layer at the current epoch. |
+| Filter | Legend or per-class bar (click = isolate, Shift + click = add, double-click = all), confusion-matrix cell, brush (`Brush` or Shift + drag). Filters combine; chips above the images clear them. |
+| Details | Hover a point / trail / thumbnail (tooltip with the image); click to pin it: Data point panel, trajectory over all steps. |
+| Keyboard | Space play / pause · ← → previous / next step · A path view · Esc unpin, then clear the brush |
+
+## Design rationale
+
+- **Audience and message.** Classmates and the instructor on a projector, who know what a neural network is but not
+  t-SNE. Message: *a network learns by pulling same-class observations together, over epochs and layer after layer;
+  where classes stay mixed, it makes its mistakes.* Every panel answers one question of `VIS_PLAN.md` §1.
+- **Two projections for two tasks.** T1 uses **one joint t-SNE per layer over all snapshot epochs**: every epoch
+  lives in the same map, so a point that moves really changed its representation (no projection noise between
+  frames; paper Sec. 5.4). T2 projects every layer of an epoch separately, but **every t-SNE starts from the Input
+  t-SNE**, which keeps clusters roughly in place across layers and across epochs. PCA (of `log1p` activations,
+  Procrustes-aligned) is offered for contrast: it keeps global variance and shows how much t-SNE "cleans up".
+- **Quality you can read.** The neighborhood hit (NH, k = 6), the paper's metric, is computed in the browser on the
+  points shown, so it follows the sample size. It appears as a badge with its change from the previous step, as the
+  separation bars of the architecture panel and in the filmstrip tooltips. Sample accuracy sits next to it.
+- **Encodings.** Hue = true class (`schemeCategory10` = matplotlib tab10, the paper's colors); misclassified points
+  are triangles in the **predicted** class color (paper convention), so errors are visible without another panel.
+  UI chrome is gray / near-black, so a saturated color always means a class; selection is a black ring. Trails use
+  lightness for progress (dark start, pure class color at the end, as in paper Fig. 1). Sequential data use
+  single-hue scales: Blues (confusion matrix), viridis ("learned at"). No explanatory text on plots: ⓘ icons.
+- **Evolution: animation + bundling.** Stepping animates points between snapshot frames (750 ms, glyph switch at
+  mid-transition); Play adds a dwell so each frame can be read, and every linked view (badges, matrix, bars,
+  softmax, curve marker, separation bars) tweens in sync. The path view draws all steps at once as trails bundled
+  with our own KDE edge bundling (the CPU counterpart of the paper's GPU bundling), **class-aware** so that a bundle
+  never mixes hues; trails draw in by segment and morph between bundling strengths.
+- **Visualization mantra.** *Overview*: path view, filmstrip of mini scatterplots, learning curve, separation bars.
+  *Zoom and filter*: zoom/pan, legend, confusion cells, brush, color-by modes, sample size, bundling strength.
+  *Details on demand*: tooltip with the image, pinned Data point panel (softmax, p(true) over epochs, trajectory),
+  image view. All views read one shared state, so every interaction is linked.
+- **Fair comparisons.** The same 1000 test images (100 per class) are used for every model, epoch and layer; the
+  sample spinner shows nested prefixes, balanced at every size. Datasets × models are all selectable.
+- **Engineering.** Everything is precomputed (static JSON, 66 MB) so the site runs on GitHub Pages and offline;
+  D3 is vendored. Trails are drawn as ~200 SVG paths (one per class × segment) instead of 10 000; the filmstrip uses
+  canvas.
+
+## Findings
+
+Numbers are t-SNE NH on all 1000 points and test accuracy (full test set, `meta.json`); paper values in brackets.
+
+| Config | Input NH | last hidden NH, epoch 0 → 50 | NH by layer, epoch 50 | test acc (paper) | best epoch |
+|---|---|---|---|---|---|
+| MNIST MLP | 0.85 (0.89) | h4 0.76 (0.84) → 0.96 (0.98) | 0.94 · 0.97 · 0.97 · 0.96 · out 0.98 | 98.4 % (98.5) | 48 |
+| MNIST CNN | 0.85 | fc 0.83 → 0.99 | 0.89 · 0.97 · 0.99 · out 1.00 | 99.7 % (99.6) | 36 |
+| SVHN MLP | 0.16 | h4 0.15 → 0.79 | 0.45 · 0.64 · 0.77 · 0.79 · out 0.79 | 85.3 % (77.4) | 47 |
+| SVHN CNN | 0.16 | fc 0.14 → 0.82 (0.85) | 0.27 · 0.65 · 0.82 · out 0.86 | 90.9 % (93.8) | 14 (92.9 %) |
+| CIFAR-10 MLP | 0.19 | h4 0.20 → 0.43 | 0.24 · 0.32 · 0.41 · 0.43 · out 0.44 | 57.1 % (52.9) | 49 |
+| CIFAR-10 CNN | 0.19 | fc 0.20 → 0.56 (0.53) | 0.28 · 0.40 · 0.56 · out 0.65 | 74.5 % (79.2) | 21 (76.8 %) |
+
+- **MNIST: easy, and learned in one epoch.** Raw pixels already separate digits (NH 0.85) and the *untrained* MLP
+  keeps most of that structure (h4 0.76), as in the paper. In T1, the epoch-0 map is a central blob and epoch 1 is
+  almost the final picture: test accuracy goes 9 % → 96 %, and 93 % of the sample is classified correctly from
+  epoch 1 to the end. The few errors sit between 3 ↔ 5 and 5 ↔ 8.
+- **SVHN: layers do the work.** Raw pixels barely separate classes (NH 0.16): t-SNE of the input is an elongated
+  strip ordered by brightness (light vs dark backgrounds). Untrained layers stay at 0.15; after training, separation
+  grows **layer by layer** (MLP 0.45 → 0.64 → 0.77 → 0.79; CNN conv1 0.27 → conv2 0.65 → fc 0.82), the clearest T2
+  story. T1 is gradual for the MLP (h4 NH 0.48 at epoch 1 → 0.78), which makes it the best Play demo.
+- **CIFAR-10: a confusion zone.** Even the best layer separates classes only partly (MLP 0.43, CNN fc 0.56); the
+  center of the map stays mixed. Cat ↔ dog is the most confused pair for both models (39 and 35 of 1000), then
+  airplane ↔ ship and bird ↔ deer. Color by *learned at* shows 43 % of the MLP sample (27 % for the CNN) is never
+  learned.
+- **Overfitting is visible.** The CNNs peak early (SVHN epoch 14, CIFAR-10 epoch 21) and then lose test accuracy while
+  train accuracy keeps rising (CIFAR-10: 90 % train vs 74.5 % test). In T1, CIFAR-10 CNN `fc` NH peaks at epoch 25
+  (0.63) and drops to 0.57 at epoch 50; at epoch 25, 8 of 10 per-class recall bars sit above their "final" marks.
+- **Across models.** The CNN beats the MLP in the last hidden layer on every dataset, and its first block changes
+  least (conv1 is only 0.04–0.11 NH above the raw input): low-level features are generic, class separation happens deeper. At epoch 0
+  the Output layer has the lowest NH of all (0.11–0.40): an untrained softmax mixes everything.
+- **Deviation from the paper:** SVHN / CIFAR-10 MLPs use lr 0.001 (lr 0.01 diverged), which explains their higher
+  accuracy than the paper's MLPs; 50 epochs instead of 100.
+
+## Submission ZIP
+
+```bash
+python package.py                          # -> dist/visual-learning.zip (site + data files + Flask app + code + docs)
+```
+
+The ZIP contains `app.py` (Flask), `app/` (site and its data files: `nodes.json` = observations, trails = edges),
+`pipeline/`, the notebook and the docs. It leaves out `raw/`, datasets, the paper PDF and virtual environments.

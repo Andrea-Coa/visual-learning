@@ -29,7 +29,7 @@ based on Rauber et al., *Visualizing the Hidden Activity of Artificial Neural Ne
 | PCA alternative | PCA(2) of **log1p(activations)**, one PCA per frame (T1 and T2), each frame Procrustes-aligned to the previous one | "Dim. red." dropdown (`VIS_PLAN.md` D4). Joint T1 PCA collapsed early epochs to a dot (activation scale grows in training); raw ReLU activations crowd most points into the center (log1p: higher NH, less crowding in 4/4 tested cases). |
 | Evolution view | **Trail bundling** precomputed in Python (KDE edge bundling, own implementation, **class-aware**), **t-SNE only, strengths medium + strong**; "none" drawn from node coordinates; + **animated point transitions** in D3 | Paper uses bundling (CUBu); the assignment additionally *requires* animation. Storing only 2 bundled levels for t-SNE keeps the data ~50 MB. |
 | Quality metric | **Neighborhood hit** (k = 6): computed **in the browser** on the visible sample; also in Python on all 1000 points (report / sanity check) | Same as paper. Browser computation follows the Sample-size control. |
-| Frontend | **Static site**: plain HTML/CSS/JS (ES modules, no build step) + **D3 v7 only** (vendored, pinned), reading precomputed JSON; deployed on **GitHub Pages** | D3-only is an assignment rule. Flask dropped (user decision, 2026-11-09): all data is precomputed, so a server adds nothing, and a static site can be shared as a link. A ~10-line Flask wrapper serving the same folder stays optional (8.5) in case the Canvas ZIP must contain one. |
+| Frontend | **Static site**: plain HTML/CSS/JS (ES modules, no build step) + **D3 v7 only** (vendored, pinned), reading precomputed JSON; deployed on **GitHub Pages**; `app.py` = small Flask wrapper serving `app/` | D3-only is an assignment rule. Flask as a backend dropped (user decision, 2026-11-09): all data is precomputed, so a server adds nothing, and a static site can be shared as a link. The wrapper (8.5) was added on 2026-11-10 because the assignment asks for "a Flask application" in the ZIP. |
 
 Note: the assignment's T1/T2 are *not* the paper's T1/T2. Here **T1 = inter-epoch**, **T2 = inter-layer**
 (both are the paper's Sec. 5.4). The paper's neuron projections (its T2, Sec. 6) are out of scope (optional stretch).
@@ -227,26 +227,53 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
   > Not done: the ▶/All "slide" on mode switch (rows are rebuilt instantly); comet tail is 7.8.
   > note (testing): ResizeObserver also doesn't fire under `--virtual-time-budget` after load; test widths with
   > `--window-size` instead.
-- [ ] 7.4 Path view (§4.3, §5.4): trails at none/medium/strong, draw-in animation, pinned unbundled trajectory.
-- [ ] 7.5 Learning curve (§5.3) and architecture panel (§5.2, click → T2; separation bars [S]).
-- [ ] 7.6 Model metrics (§5.7): per-epoch confusion matrix with cell filter, per-class bars.
-- [ ] 7.7 Image view (§5.6) and data-point panel (§5.8), both linked to the scatter.
-- [ ] 7.8 [S] items of §12 (color-by modes, ghost bars, learned-at chart, keyboard, filter chips, …).
-- [ ] 7.9 Polish against `style-references/`; projector check (1920×1080); ⓘ icons instead of text on plots;
+- [x] 7.4 Path view (§4.3, §5.4): trails at none/medium/strong, draw-in animation, pinned unbundled trajectory.
+  > note: `js/paths.js` (`PathLayer`) + path code in `scatter.js`. Trails grouped into one SVG path per
+  > (class, segment, filter state) ≈ 200 elements; "none" = straight lines resampled to 4 samples / segment, so all
+  > strengths morph (600 ms). Draw-in = segment-by-segment fade, staggered by class (not stroke-dash). Hover = nearest
+  > trail sample (quadtree); brush uses trail ends; pinned trajectory (unbundled, dot + label per step) also in
+  > scatter mode (`trajectory` state, Data point checkbox). Trail opacity uses `stroke-opacity` / `fill-opacity`
+  > attributes, not CSS opacity (no compositing layer per path).
+- [x] 7.5 Learning curve (§5.3) and architecture panel (§5.2, click → T2; separation bars [S]).
+  > note: `js/curve.js` ([Acc | Loss] in the panel title = `curve` state), `js/architecture.js` (bars = T2 NH of
+  > every layer at the current epoch; in T2 path view a gray dark→light stripe is the trail-lightness legend).
+- [x] 7.6 Model metrics (§5.7): per-epoch confusion matrix with cell filter, per-class bars.
+  > note: `js/model-metrics.js`; hover cell = `cellHover` state (temporary highlight in the scatter), click = `cellFilter`;
+  > hovered / pinned point's cell outlined; ghost = thin mark at the final-epoch value; `metric` state for the dropdown.
+- [x] 7.7 Image view (§5.6) and data-point panel (§5.8), both linked to the scatter.
+  > note: `js/images.js` (images = sample ∩ all filters, header names the top-priority source; order fixed until the
+  > source / sort changes, badges update per epoch), `js/datapoint.js`. `Config.learnedAt` added in data.js.
+- [x] 7.8 [S] items of §12 (color-by modes, ghost bars, learned-at chart, keyboard, filter chips, …).
+  > note: color-by class / correctness / learned at (legend switches; never learned = hollow triangle), comet tail of
+  > the pinned point during Play, filter chips in the image view. Shared encodings in `js/encoding.js`.
+  > Not done (minor): the ▶/All "slide" on mode switch and the filmstrip cross-fade on dataset change.
+- [x] 7.9 Polish against `style-references/`; projector check (1920×1080); ⓘ icons instead of text on plots;
       empty/loading states (§9).
+  > note: screenshots at 1920×1080 and 1280×720; controls never shrink (left column: architecture scrolls, curve
+  > shrinks to 160 px). 4 browser suites in scratch (scatter 29, steppers 33, paths 27, panels 39 checks) all pass.
+  > note (testing): headless Chrome screenshots under `--virtual-time-budget` miss SVG changes made after the last
+  > composited frame (the DOM is right). Clone the SVGs (`el.replaceWith(el.cloneNode(true))`) before the shot.
 
 ## Phase 8 — Documentation & delivery
 
-- [ ] 8.1 `README.md`: link to the GitHub Pages site, how to run (Colab training, local pipeline, local server),
+- [x] 8.1 `README.md`: link to the GitHub Pages site, how to run (Colab training, local pipeline, local server),
       data schema, **design rationale** (why t-SNE, joint vs chained projection, bundling + animation,
       color/glyph encodings, interaction mapping to mantra).
-- [ ] 8.2 Findings write-up per dataset (compare with paper: untrained MLP already separates MNIST; later layers
+  > note: sections "Using the site", "Design rationale", "Findings", "Submission ZIP"; code table lists every module.
+- [x] 8.2 Findings write-up per dataset (compare with paper: untrained MLP already separates MNIST; later layers
       separate better; SVHN light/dark-background split; CIFAR-10 confusion zone; early epochs at center of T1).
-- [ ] 8.3 Test end-to-end: deployed Pages site + local `python -m http.server -d app`, in Chrome and Firefox.
-- [ ] 8.4 Build the submission ZIP (`app/` = site + data files; exclude `.venv`, `raw/`).
-- [ ] 8.5 *(optional)* `app.py`: ~10-line Flask wrapper serving `app/` as static files, only if the course insists
+  > note: in README "Findings" (table + 6 bullets); numbers = browser NH on all 1000 points (same `metrics.js`).
+- [~] 8.3 Test end-to-end: deployed Pages site + local `python -m http.server -d app`, in Chrome and Firefox.
+  > note: done: local http.server + Flask wrapper (also from the extracted ZIP), Chrome headless, all 6 configs ×
+  > 2 methods. Pending (user): Pages deploy (6.6) and Firefox / Safari by hand (not installed / not scriptable here).
+- [x] 8.4 Build the submission ZIP (`app/` = site + data files; exclude `.venv`, `raw/`).
+  > note: `python package.py` → `dist/visual-learning.zip` (28 MB, git-ignored). Rebuild after any change.
+- [x] 8.5 *(optional)* `app.py`: ~10-line Flask wrapper serving `app/` as static files, only if the course insists
       on a Flask app in the ZIP.
-- [ ] 8.6 Prepare the in-class presentation (live demo script + 3–5 key insights; keep a local copy for offline use).
+  > note: done (the assignment text asks for a Flask application). Tested: MIME types OK (`text/javascript` for modules).
+  > `.venv` on the macOS machine only has Flask (Python 3.9); the pipeline needs the full `requirements.txt`.
+- [x] 8.6 Prepare the in-class presentation (live demo script + 3–5 key insights; keep a local copy for offline use).
+  > note: `PRESENTATION.md` (6-step demo, takeaways, fallback).
 
 ## Stretch (only if time allows)
 
@@ -276,3 +303,4 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 | 2026-11-10 | Claude | Full check on macOS (no `raw/`, no `.venv`): pipeline compiles, `app/data/` consistent (only ±1 rounding on trail endpoints), all 6 configs × 2 methods + trails load in Chrome. 7.1 controls panel done (`controls.js`, `ui.js`). Next: 7.2 scatter. |
 | 2026-11-10 | Claude | 7.2 scatter done (`scatter.js`, `metrics.js`): glyphs, legend filter, zoom/pan, brush, tooltip, pin, NH/acc badges, §6 animations of the scatter; 29-check browser test passes. Next: 7.3 steppers + Play. |
 | 2026-11-10 | Claude | 7.3 done (`steppers.js`): filmstrip rows, Play/speed/All, keyboard, time axis; legend placed outside the plot when room. Steppers test (33 checks) + scatter regression (29) pass; screenshots at 1920 / 1300 px. Next: 7.4 path view. |
+| 2026-11-10 | Claude | 7.4–7.9 done (path view, curve, architecture, metrics, images, data point, color-by, comet, chips; layout fixes). 8.1/8.2/8.4/8.5/8.6 done (README rationale + findings, `package.py`, `app.py`, `PRESENTATION.md`). Left for the user: 6.6 Pages setting + push, 8.3 Firefox check. |
