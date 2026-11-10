@@ -215,8 +215,18 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
   > note (testing): headless Chrome with `--virtual-time-budget` never fires `requestAnimationFrame` inside an iframe,
   > so D3 transitions hang there. Test pages must load the app in the same window (`<base href>`) with an rAF→setTimeout
   > shim before D3.
-- [ ] 7.3 Steppers + animation (§5.5, §6): layer/epoch rows, Play/speed on the active row, animated transitions;
+- [x] 7.3 Steppers + animation (§5.5, §6): layer/epoch rows, Play/speed on the active row, animated transitions;
       then the canvas filmstrip [S].
+  > note: `js/steppers.js`. Active row = canvas filmstrip (64 px → 48 px → plain buttons as width shrinks; hover = NH
+  > tooltip, class filter dims thumbnails) + Play / All / speed; epoch filmstrip has a compact proportional time axis
+  > (leader lines to the true epoch). Play: first step immediately, then every (750 + 450) / speed ms; stops after the
+  > last step; ▶ at the last step restarts; any manual step change or dataset/model/projection/mode change pauses.
+  > Scatter motion and badge tweens are divided by `speed` while playing. Keyboard: Space, ← / →, A (Esc in scatter).
+  > Switching to T1 while on Input moves to the first hidden layer. Shared helpers: `frameOf` (data.js),
+  > `cachedNeighborhoodHit` (metrics.js). Legend now starts outside the square plot when there is side room.
+  > Not done: the ▶/All "slide" on mode switch (rows are rebuilt instantly); comet tail is 7.8.
+  > note (testing): ResizeObserver also doesn't fire under `--virtual-time-budget` after load; test widths with
+  > `--window-size` instead.
 - [ ] 7.4 Path view (§4.3, §5.4): trails at none/medium/strong, draw-in animation, pinned unbundled trajectory.
 - [ ] 7.5 Learning curve (§5.3) and architecture panel (§5.2, click → T2; separation bars [S]).
 - [ ] 7.6 Model metrics (§5.7): per-epoch confusion matrix with cell filter, per-class bars.
@@ -264,4 +274,5 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 | 2026-11-09 | Claude | Phase 5 done: `pipeline/export.py` → `app/data/` (index, meta, nodes, coords per method, trails per view, sprites; 66 MB), verified, schema in README. Next: Phase 6 (site skeleton + Pages). |
 | 2026-11-09 | Claude | Phase 6 done except the first Pages deploy (6.6, needs user): layout, vendored D3 7.9.0, `data.js`, `state.js`, `main.js`, Pages workflow; Node tests + headless-Edge screenshots. Default branch is `main` (README links fixed). Next: Phase 7.1 (controls). |
 | 2026-11-10 | Claude | Full check on macOS (no `raw/`, no `.venv`): pipeline compiles, `app/data/` consistent (only ±1 rounding on trail endpoints), all 6 configs × 2 methods + trails load in Chrome. 7.1 controls panel done (`controls.js`, `ui.js`). Next: 7.2 scatter. |
-| 2026-11-10 | Claude | 7.2 scatter done (`scatter.js`, `metrics.js`): glyphs, legend filter, zoom/pan, brush, tooltip, pin, NH/acc badges, §6 animations of the scatter; 31-check browser test passes. Next: 7.3 steppers + Play. |
+| 2026-11-10 | Claude | 7.2 scatter done (`scatter.js`, `metrics.js`): glyphs, legend filter, zoom/pan, brush, tooltip, pin, NH/acc badges, §6 animations of the scatter; 29-check browser test passes. Next: 7.3 steppers + Play. |
+| 2026-11-10 | Claude | 7.3 done (`steppers.js`): filmstrip rows, Play/speed/All, keyboard, time axis; legend placed outside the plot when room. Steppers test (33 checks) + scatter regression (29) pass; screenshots at 1920 / 1300 px. Next: 7.4 path view. |
