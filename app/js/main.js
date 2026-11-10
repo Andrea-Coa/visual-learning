@@ -1,8 +1,8 @@
-// Entry point: creates the shared data store and UI state, loads the configuration selected in the state and
-// keeps it in sync. The panels (Phase 7) subscribe to the same store; until they exist, this module renders the
-// generated title and the loading / error states (VIS_PLAN.md §5.4, §9).
+// Entry point: creates the shared data store and UI state, builds the panels, loads the configuration selected in
+// the state and hands it to the panels. Loading / error states are an overlay on the plot (VIS_PLAN.md §9).
 import { initControls } from "./controls.js";
 import { DataStore } from "./data.js";
+import { initScatter } from "./scatter.js";
 import { Store } from "./state.js";
 
 const PROJECTION_NAMES = { tsne: "t-SNE", pca: "PCA" };
@@ -13,13 +13,15 @@ const store = new Store();
 /** Everything the views need for the current dataset / model / projection. */
 export const current = { index: null, config: null, coords: null };
 
+const plot = document.getElementById("plot");
+const message = document.createElement("div");
+plot.append(message);
+
+/** Shows `text` over the plot (class "loading" or "error"); no text hides the overlay. */
 function plotMessage(text, className = "loading") {
-  const plot = document.getElementById("plot");
-  plot.replaceChildren();
-  const div = document.createElement("div");
-  div.className = className;
-  div.textContent = text;
-  plot.append(div);
+  message.className = `plot-message ${className}`;
+  message.textContent = text;
+  message.hidden = !text;
 }
 
 /** Generated plot title, e.g. "MNIST · MLP · layer h4 · epoch 8 · t-SNE" (§5.4). */
@@ -40,8 +42,9 @@ function renderTitle(state) {
 }
 
 let loadToken = 0;
+let scatter = null;
 
-/** Loads the selected configuration and fills in the state keys that depend on it (layer, epoch). */
+/** Loads the selected configuration, fills in the state keys that depend on it (layer, epoch), updates the views. */
 async function loadConfiguration(state) {
   const token = ++loadToken;
   const { index } = current;
@@ -55,11 +58,13 @@ async function loadConfiguration(state) {
     Object.assign(current, { config, coords });
 
     const patch = {};
-    if (!config.t2Layers.includes(state.layer)) patch.layer = config.lastHiddenLayer;
-    if (!config.epochs.includes(state.epoch)) patch.epoch = config.epochs[config.epochs.length - 1];
+    if (!config.t2Layers.includes(store.state.layer)) patch.layer = config.lastHiddenLayer;
+    if (!config.epochs.includes(store.state.epoch)) patch.epoch = config.epochs[config.epochs.length - 1];
     if (Object.keys(patch).length) store.set(patch);
-    plotMessage("", "plot-ready");
+    plotMessage("");
     renderTitle(store.state);
+    const { dataset, model, projection } = state;
+    scatter.setConfiguration({ index, config, coords, dataset, model, projection, spriteUrl: data.spriteUrl(dataset) });
   } catch (err) {
     if (token === loadToken) plotMessage(`Could not load the data (${err.message}).`, "error");
     console.error(err);
@@ -69,6 +74,7 @@ async function loadConfiguration(state) {
 async function main() {
   current.index = await data.index();
   initControls(document.getElementById("controls"), { store, index: current.index });
+  scatter = initScatter(plot, { store, tools: document.getElementById("embeddings-tools") });
   store.subscribe(loadConfiguration, ["dataset", "model", "projection"]);
   store.subscribe(renderTitle, ["mode", "layer", "epoch"]);
   await loadConfiguration(store.state);

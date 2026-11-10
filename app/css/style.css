@@ -132,7 +132,7 @@ html, body {
   text-transform: none;
   text-overflow: ellipsis;
 }
-.panel-tools { margin-left: auto; display: flex; gap: 4px; }
+.panel-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 
 .panel-body {
   flex: 1 1 auto;
@@ -260,12 +260,197 @@ select.control-input:disabled {
 .plot {                 /* the square plot is sized by JS to min(width, height) and centered */
   position: relative;
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   align-items: center;
   justify-content: center;
   min-height: 0;
+  overflow: hidden;
 }
+.plot-message {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--panel);
+}
+.plot-message[hidden] { display: none; }
 .steppers { flex: none; }
+
+/* ---------------------------------------------------------------- embeddings toolbar (panel title) */
+
+.panel-tools { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.seg button,
+.tool-btn {
+  height: 22px;
+  padding: 0 9px;
+  border: 0;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--border-strong); }
+.seg button:hover:not(.active),
+.tool-btn:hover { background: var(--hover); }
+.seg button.active { background: var(--ink); color: #fff; }
+.tool-btn { border: 1px solid var(--border-strong); border-radius: 3px; }
+.tool-icon { width: 24px; padding: 0; font-size: 14px; line-height: 1; }
+
+/* ---------------------------------------------------------------- scatterplot (VIS_PLAN.md §5.4, §4.2) */
+
+.scatter { position: relative; flex: none; }
+.scatter-svg { display: block; cursor: grab; user-select: none; }
+.scatter-svg:active { cursor: grabbing; }
+.scatter-svg.brush-mode { cursor: crosshair; }
+.scatter-frame { fill: var(--panel); stroke: var(--border); }
+.pt { cursor: pointer; }
+.pt path { stroke: none; }
+.pt path.emph { stroke: var(--ink); stroke-width: 1.5px; }
+.pin-ring { fill: none; stroke: var(--ink); stroke-width: 1.5px; }
+.pin-label {
+  fill: var(--ink);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+  pointer-events: none;
+}
+.brush-rect {
+  fill: rgba(34, 34, 34, 0.06);
+  stroke: var(--ink);
+  stroke-dasharray: 4 3;
+  pointer-events: none;
+}
+
+.badges {                       /* quality badges, top-right corner of the plot */
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  pointer-events: auto;
+}
+.badge { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.badge-label { color: var(--muted); font-size: var(--fs-small); }
+.badge-value { font-weight: 600; }
+.badge-delta { min-height: 1.15em; color: var(--muted); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+
+.legend {                       /* draggable, collapsible legend + class filter */
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  min-width: 150px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.legend-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 4px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: move;
+}
+.legend-toggle {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.legend-toggle::before {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  margin: 3px auto 0;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg);
+}
+.legend.collapsed .legend-toggle::before { margin-top: 6px; transform: rotate(-135deg); }
+.legend.collapsed .legend-header { border-bottom: none; }
+.legend.collapsed .legend-items,
+.legend.collapsed .legend-key { display: none; }
+.legend-items { display: flex; flex-direction: column; padding: 3px 0; }
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 8px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.legend-item:hover { background: var(--hover); }
+.legend-item.off { color: var(--faint); }
+.legend-item.off .chip { opacity: 0.25; }
+.legend-count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.legend-key {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px 5px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+.legend-key path { fill: var(--muted); }
+
+.chip {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.scatter-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.scatter-empty[hidden] { display: none; }
+.scatter-empty button { pointer-events: auto; }
+
+/* thumbnails cut from the sprite sheet: keep the pixels sharp */
+.thumb { flex: none; background-repeat: no-repeat; image-rendering: pixelated; }
+.tip-point { display: flex; gap: 8px; align-items: center; }
+.tip-thumb { width: 64px; height: 64px; border: 1px solid var(--border); }
+.tip-text { display: flex; flex-direction: column; gap: 2px; }
+.tip-id { color: var(--muted); font-size: var(--fs-small); }
+.tip-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 
 /* ---------------------------------------------------------------- states (VIS_PLAN.md §9) */
 

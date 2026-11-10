@@ -243,11 +243,13 @@ The site lives under `/visual-learning/`, so all paths in the code are relative.
 
 | File | Role |
 |---|---|
-| `main.js` | entry point: creates the data store and the UI state, loads the selected configuration |
+| `main.js` | entry point: creates the data store, the UI state and the panels; loads the selected configuration |
 | `data.js` | fetches and caches the data files, decodes them into typed arrays (`Index`, `Config`, `Coords`, `Trails`) |
 | `state.js` | shared UI state (`VIS_PLAN.md` §3) with change notifications and the reset rules |
 | `controls.js` | controls panel (`VIS_PLAN.md` §5.1): dropdowns and sample spinner, two-way bound to the state |
 | `ui.js` | shared floating tooltip and ⓘ info icons |
+| `scatter.js` | embeddings view, scatter mode (`VIS_PLAN.md` §5.4): points, legend, zoom/pan, brush, tooltip, pin, badges |
+| `metrics.js` | neighborhood hit and sample accuracy, computed on the shown points |
 
 `data.js` and `state.js` use neither D3 nor the DOM, so they can be tested with Node. In the browser console,
 `app.store.set({ dataset: "svhn" })` changes the state by hand.
