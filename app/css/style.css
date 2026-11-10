@@ -1,0 +1,235 @@
+/* Visual Learning. Neutral chrome so that the only saturated colors on screen are data (class) colors
+   (VIS_PLAN.md §4.1); panel style after the references in style-references/. */
+
+:root {
+  --bg: #eef0f2;
+  --panel: #ffffff;
+  --panel-header: #f7f7f7;
+  --border: #d9dcdf;
+  --border-strong: #b9bdc2;
+  --text: #222222;
+  --muted: #6f747a;
+  --faint: #a7abb0;
+  --ink: #222222;          /* selection, current step, rules: near-black, never a hue */
+  --hover: #f0f1f3;
+
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --fs-base: 12px;
+  --fs-title: 12px;
+  --fs-small: 11px;
+  --fs-metric: 16px;
+
+  --gap: 8px;
+  --radius: 4px;
+  --left-width: 260px;
+  --right-width: 320px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-base);
+}
+
+/* ---------------------------------------------------------------- layout (VIS_PLAN.md §2) */
+
+.layout {
+  display: grid;
+  grid-template-columns: var(--left-width) minmax(560px, 1fr) var(--right-width);
+  grid-template-areas: "left center right";
+  gap: var(--gap);
+  height: 100vh;
+  padding: var(--gap);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+  min-width: 0;
+}
+.column-left   { grid-area: left; }
+.column-center { grid-area: center; }
+.column-right  { grid-area: right; }
+
+/* Below 1280 px the right column moves under the center one and the page scrolls. */
+@media (max-width: 1279px) {
+  .layout {
+    grid-template-columns: var(--left-width) minmax(0, 1fr);
+    grid-template-areas: "left center" "left right";
+    height: auto;
+    min-height: 100vh;
+  }
+  .column-center { min-height: 90vh; }
+  .column-right { flex-direction: row; flex-wrap: wrap; }
+  .column-right > .panel { flex: 1 1 300px; }
+}
+
+/* ---------------------------------------------------------------- brand */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 2px;
+}
+.brand h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.brand-logo { width: 30px; height: 30px; flex: none; }
+.brand-logo circle { fill: var(--ink); }
+.brand-logo path { fill: none; stroke: var(--ink); stroke-width: 1.4; }
+
+/* ---------------------------------------------------------------- panels */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.panel-grow { flex: 1 1 auto; }
+#curve-panel { flex: 0 0 210px; }
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  background: var(--panel-header);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-size: var(--fs-title);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.panel-title::before {        /* small square glyph, as in the reference systems */
+  content: "";
+  width: 7px;
+  height: 7px;
+  flex: none;
+  background: var(--ink);
+}
+.panel-subtitle {
+  overflow: hidden;
+  color: var(--muted);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  text-overflow: ellipsis;
+}
+.panel-tools { margin-left: auto; display: flex; gap: 4px; }
+
+.panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px 10px;
+  overflow: auto;
+}
+
+/* Collapsible panels (<details>) */
+details.panel > summary { cursor: pointer; list-style: none; user-select: none; }
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform 150ms;
+}
+details.panel:not([open]) > summary::after { transform: rotate(-45deg); }
+details.panel:not([open]) { flex: none; }
+details.panel:not([open]) > summary { border-bottom: none; border-radius: var(--radius); }
+
+/* ---------------------------------------------------------------- center column */
+
+.panel-embeddings { flex: 0 0 72%; }
+.panel-images { flex: 1 1 auto; }
+
+.embeddings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+.plot {                 /* the square plot is sized by JS to min(width, height) and centered */
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+.steppers { flex: none; }
+
+/* ---------------------------------------------------------------- states (VIS_PLAN.md §9) */
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, #f3f4f5 25%, #e9ebed 50%, #f3f4f5 75%) 0 0 / 200% 100%;
+  color: var(--muted);
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.error { color: #9b1c1c; }
+
+/* ---------------------------------------------------------------- shared widgets */
+
+.tooltip {
+  position: fixed;
+  z-index: 10;
+  max-width: 260px;
+  padding: 6px 8px;
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+.info {                 /* ⓘ icon: explanations live behind it, never as text on a plot */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--faint);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 600;
+  cursor: help;
+}
+
+.metric {
+  font-size: var(--fs-metric);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

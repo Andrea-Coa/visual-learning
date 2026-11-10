@@ -20,8 +20,10 @@ pipeline/                 Python pipeline (runs on Colab or locally)
   metrics.py              confusion matrix, precision / recall / F1
   train.py                training + activation snapshots + metrics (entry point)
   project.py              t-SNE / PCA projections for T1 and T2 + neighborhood hit (entry point)
+  bundle.py               class-aware bundling of the t-SNE trails (entry point)
+  export.py               writes the site data files to app/data/ (entry point)
 notebooks/colab_train.ipynb   runs pipeline/train.py on a Colab T4
-app/                      Flask + D3 app (later phases)
+app/                      static D3 site, deployed on GitHub Pages (later phases)
 raw/                      training outputs (git-ignored, large)
 data/                     downloaded datasets (git-ignored)
 ```
@@ -52,10 +54,10 @@ As in the paper (Sec. 4), with plain SGD (lr 0.01, momentum 0.9, Keras-style lr 
 The code comes from GitHub (`https://github.com/Andrea-Coa/visual-learning`, public, so no token needed). Only the
 **outputs** go to Google Drive, so they survive disconnects.
 
-1. **Push your changes.** Colab trains whatever is on `master` on GitHub, so push any local changes to `pipeline/` first.
+1. **Push your changes.** Colab trains whatever is on `main` on GitHub, so push any local changes to `pipeline/` first.
 2. **Open the notebook in Colab.** Go to `File > Open notebook > GitHub`, paste the repo URL and pick
    `notebooks/colab_train.ipynb`. Or open
-   `https://colab.research.google.com/github/Andrea-Coa/visual-learning/blob/master/notebooks/colab_train.ipynb`.
+   `https://colab.research.google.com/github/Andrea-Coa/visual-learning/blob/main/notebooks/colab_train.ipynb`.
 3. **Select the GPU.** `Runtime > Change runtime type > T4 GPU`.
 4. **Configure.** In the configuration cell, choose which `DATASETS` / `MODELS` this account trains
    (default: all six configurations).
@@ -193,3 +195,72 @@ On an 8-core laptop, PCA takes ~10 s per configuration and t-SNE ~15 min (~1.5 h
   to the previous one.
 - PCA uses `log1p` of the activations (ReLU outputs are heavy-tailed); t-SNE uses PCA-50 of the raw activations.
 - The neighborhood hit (k = 6, share of each point's 6 nearest neighbors in the same class) is stored for every frame.
+
+## Step by step: trail bundling (local)
+
+After the projections exist:
+
+```bash
+python -m pipeline.bundle                     # all configurations (~20 s each); --force recomputes
+```
+
+Results go to `raw/<dataset>/<model>/trails_tsne.npz`. Every observation gets a trail through its t-SNE positions
+(T1: over epochs, one set per layer; T2: over layers, one set per epoch). The trails are bundled with kernel density
+edge bundling (KDEEB), the CPU counterpart of the paper's GPU bundling:
+- **Class-aware:** a trail is only pulled towards trails of its own class, so bundles never mix class colors.
+- **Two strengths are stored:** medium and strong. Unbundled trails are drawn directly from the projected points.
+- **Fixed endpoints:** the first and last points of a trail never move.
+- **Format:** coordinates are stored as integers 0–9999 in the unit square. Sample `i` of a trail belongs to step `i / 4`.
+
+## Step by step: export the site data (local)
+
+```bash
+python -m pipeline.export                     # raw/ -> app/data/ (~1 min, ~66 MB)
+```
+
+The export replaces the generated files of every configuration that has projections in `raw/`. `app/data/` is
+committed: it's what the site (and GitHub Pages) serves.
+
+## Run the site
+
+The site in `app/` is static: HTML, CSS, D3 v7 (copied into `app/js/vendor/`, so it also works offline) and the
+JSON in `app/data/`. There is no build step and no server code.
+
+**Locally:** browsers don't let a page loaded from `file://` read its data files, so serve the folder:
+
+```bash
+python -m http.server 8000 -d app          # then open http://localhost:8000
+```
+
+**GitHub Pages:** `.github/workflows/pages.yml` publishes `app/` on every push to `main` that changes `app/`,
+or on a manual run from the Actions tab.
+1. One-time setup on GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+2. Push. The site appears at `https://andrea-coa.github.io/visual-learning/`.
+
+The site lives under `/visual-learning/`, so all paths in the code are relative. Keep it that way.
+
+**Code layout (`app/js/`):**
+
+| File | Role |
+|---|---|
+| `main.js` | entry point: creates the data store and the UI state, loads the selected configuration |
+| `data.js` | fetches and caches the data files, decodes them into typed arrays (`Index`, `Config`, `Coords`, `Trails`) |
+| `state.js` | shared UI state (`VIS_PLAN.md` §3) with change notifications and the reset rules |
+
+`data.js` and `state.js` use neither D3 nor the DOM, so they can be tested with Node. In the browser console,
+`app.store.set({ dataset: "svhn" })` changes the state by hand.
+
+## Site data files (`app/data/`)
+
+All JSON is compact. **Coordinates** are integers `0..9999` in the unit square, with x to the right and y down
+(already flipped for SVG). A **flat point array** is `[x0, y0, x1, y1, …]`, indexed by observation id
+`0..999` (the position in the subset).
+
+| File | Content |
+|---|---|
+| `index.json` | `scale`; `datasets[]`: `id`, `name`, `classes`, `sprite` {`file`, `cell` px, `columns`, `count`}, `models[]` {`id`, `name`, `methods` (`tsne`, `pca`), `trails` (`["tsne"]`)} |
+| `<ds>/sprites.png` | the 1000 subset images in a grid of `columns` cells of `cell`×`cell` px; image `i` is at column `i % columns`, row `floor(i / columns)` |
+| `<ds>/<model>/meta.json` | `classes`, `epochs` (snapshot epochs), `layers[]` {`id`, `label`, `units`, `type`, `dropout`} from Input to Output, `t1Layers`, `t2Layers`, `training` (hyperparameters), `history` {`epoch`, `trainAcc`, `testAcc`, `trainLoss`, `testLoss`} for every epoch 0–50, `metrics` {`testAcc`, `trainAcc`, `paperTestAcc`, `bestEpoch`, `bestTestAcc`} |
+| `<ds>/<model>/nodes.json` | `n`, `labels[obs]`, `testIndex[obs]` (index in the original test set), `sampleOrder` (the first 100·k ids hold 10·k per class; identical for both models), `preds[epoch][obs]`, `probs[epoch]` = flat `[obs × 10]` probabilities in per mille (`probScale` = 1000) |
+| `<ds>/<model>/coords_<method>.json` | `t1[layer][epoch]` and `t2[epoch][layer]`, each a flat point array. `epoch` indexes `meta.epochs`; `layer` names follow `t1Layers` (keys) / `t2Layers` (order) |
+| `<ds>/<model>/trails/t1_<layer>.json`, `t2_e<epoch>.json` | t-SNE only: `strengths` (`medium`, `strong`), `samplesPerSegment` (4), `trails[strength][obs]` = flat point array of the bundled trail; point `i` belongs to step `i / 4` (an epoch index for T1, a layer index for T2). Unbundled trails: join the points of `coords` directly |

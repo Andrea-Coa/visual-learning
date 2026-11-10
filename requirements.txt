@@ -11,8 +11,8 @@ scikit-learn>=1.4
 openTSNE>=1.0
 pillow>=10.0
 
-# Web app (phase 6-7)
-flask>=3.0
+# Optional wrapper (phase 8)
+flask>=3.0           # optional: only for the Flask wrapper (PLAN 8.5); the site is static
 
 # Reading the paper PDF
 pymupdf>=1.24

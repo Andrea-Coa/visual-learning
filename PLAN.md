@@ -27,9 +27,9 @@ based on Rauber et al., *Visualizing the Hidden Activity of Artificial Neural Ne
 | T1 (epochs) projection | **One joint t-SNE per layer** (every hidden layer + Output) over the union of all epoch snapshots (paper Sec. 5.4, inter-epoch) | Single projection ⇒ no spurious frame-to-frame motion. Every layer is needed by the UI (`VIS_PLAN.md` D1). |
 | T2 (layers) projection | **For every snapshot epoch**, layers Input → hidden → Output; t-SNE of the Input (network input pixels, same at every epoch) is the **initialization** of every other t-SNE (paper Sec. 5.4, inter-layer) | Shared init keeps clusters roughly in place across layers *and* across epochs. |
 | PCA alternative | PCA(2) of **log1p(activations)**, one PCA per frame (T1 and T2), each frame Procrustes-aligned to the previous one | "Dim. red." dropdown (`VIS_PLAN.md` D4). Joint T1 PCA collapsed early epochs to a dot (activation scale grows in training); raw ReLU activations crowd most points into the center (log1p: higher NH, less crowding in 4/4 tested cases). |
-| Evolution view | **Trail bundling** precomputed in Python (KDE edge bundling, own implementation), **t-SNE only, strengths medium + strong**; "none" drawn from node coordinates; + **animated point transitions** in D3 | Paper uses bundling (CUBu); the assignment additionally *requires* animation. Storing only 2 bundled levels for t-SNE keeps the data ~50 MB. |
+| Evolution view | **Trail bundling** precomputed in Python (KDE edge bundling, own implementation, **class-aware**), **t-SNE only, strengths medium + strong**; "none" drawn from node coordinates; + **animated point transitions** in D3 | Paper uses bundling (CUBu); the assignment additionally *requires* animation. Storing only 2 bundled levels for t-SNE keeps the data ~50 MB. |
 | Quality metric | **Neighborhood hit** (k = 6): computed **in the browser** on the visible sample; also in Python on all 1000 points (report / sanity check) | Same as paper. Browser computation follows the Sample-size control. |
-| Frontend | **D3 v7 only** (no other vis libs), served by **Flask** | Assignment rule. |
+| Frontend | **Static site**: plain HTML/CSS/JS (ES modules, no build step) + **D3 v7 only** (vendored, pinned), reading precomputed JSON; deployed on **GitHub Pages** | D3-only is an assignment rule. Flask dropped (user decision, 2026-11-09): all data is precomputed, so a server adds nothing, and a static site can be shared as a link. A ~10-line Flask wrapper serving the same folder stays optional (8.5) in case the Canvas ZIP must contain one. |
 
 Note: the assignment's T1/T2 are *not* the paper's T1/T2. Here **T1 = inter-epoch**, **T2 = inter-layer**
 (both are the paper's Sec. 5.4). The paper's neuron projections (its T2, Sec. 6) are out of scope (optional stretch).
@@ -51,12 +51,12 @@ visual-learning/
 │   └── export.py              # writes app/data/** JSON + image sprite sheets
 ├── notebooks/colab_train.ipynb  # thin wrapper: clone/upload repo, run pipeline on T4
 ├── raw/                       # (git-ignored) .npz activations from Colab
-└── app/                       # Flask deliverable
-    ├── app.py
-    ├── templates/index.html
-    ├── static/css/style.css
-    ├── static/js/             # main.js, scatter.js, trails.js, controls.js, ...
-    └── data/<dataset>/<model>/  # nodes + edges files (deliverable)
+├── .github/workflows/pages.yml  # deploys app/ to GitHub Pages
+└── app/                       # static site = the deliverable (committed, data included)
+    ├── index.html
+    ├── css/style.css
+    ├── js/                    # main.js (state + wiring), one module per panel, vendor/d3.v7.min.js
+    └── data/                  # index.json + <dataset>/<model>/** (nodes + edges files), <dataset>/sprites.png
 ```
 
 ---
@@ -66,6 +66,7 @@ visual-learning/
 - [x] 0.1 Create folder skeleton above; add `.gitignore` (`.venv/`, `raw/`, `__pycache__/`).
   > note: `/data/` and `/raw/` are root-anchored in `.gitignore` so `app/data/` (deliverable) is NOT ignored.
 - [x] 0.2 Fill `requirements.txt` (local): `torch`, `torchvision`, `numpy`, `scikit-learn`, `openTSNE`, `scipy`, `pillow`, `flask`.
+  > note: `flask` is now optional (only for the 8.5 wrapper); the site itself is static.
   > note: installed in `.venv` (Python 3.13, torch 2.15 CPU, openTSNE 1.0.4) without issues.
 - [x] 0.3 Colab notebook skeleton that installs deps, mounts Drive, and runs `pipeline/train.py`.
   > note: `notebooks/colab_train.ipynb`; no installs needed (Colab ships torch/torchvision/scipy). Not yet run on Colab.
@@ -127,28 +128,62 @@ visual-learning/
 
 ## Phase 4 — Trail bundling
 
-- [ ] 4.1 `bundle.py`: build one polyline per observation through its sequence of positions
+- [x] 4.1 `bundle.py`: build one polyline per observation through its sequence of positions
       (epochs for T1, layers for T2); resample to ~4 points per segment.
-- [ ] 4.2 KDE edge bundling: density map of trail points → move points up the density gradient →
+  > note: `python -m pipeline.bundle [--dataset ..] [--model ..] [--force]` → `raw/<ds>/<model>/trails_tsne.npz`:
+  > `t1` uint16 [layer, strength, obs, 41, 2], `t2` uint16 [epoch, strength, obs, 17|21, 2]. Sample i belongs to
+  > step i / 4 (use it for the dark→bright progress color). ~20 s per config.
+- [x] 4.2 KDE edge bundling: density map of trail points → move points up the density gradient →
       smooth → repeat (a few iterations); keep endpoints fixed.
-- [ ] 4.3 Two bundling strengths (medium, strong), **t-SNE only**; "none" = straight polylines from node coordinates in the UI.
-- [ ] 4.4 Quantize coordinates to integers 0–9999 to keep JSON small (~50 MB total for all views).
+  > note: **class-aware** (each trail attracted only by its own class's density): global bundling merged different
+  > classes into shared highways, misleading with hue = class. Samples weighted by segment length. Endpoints verified exact.
+- [x] 4.3 Two bundling strengths (medium, strong), **t-SNE only**; "none" = straight polylines from node coordinates in the UI.
+  > note: medium = 6 iterations, strong = 24 (14 looked almost identical to medium).
+- [x] 4.4 Quantize coordinates to integers 0–9999 to keep JSON small (~50 MB total for all views).
+  > note: done in `bundle.py` (uint16). All trails ≈ 9.4 M integers ≈ 47 MB as JSON text.
 
 ## Phase 5 — Export (deliverable data files)
 
-- [ ] 5.1 Define the JSON schema (document it in README). One file per view, loaded on demand by the UI:
-  - `meta.json` — dataset, model, classes & colors, architecture (names, widths, types, dropout), epochs,
-    learning curves (`history.json`), final metrics, nested sample order (`VIS_PLAN.md` D10).
-  - `nodes.json` — per observation: id, true label, per-epoch `pred` and softmax `probs`.
-  - `<method>/t1_<layer>.json` — coords [epoch][obs]; `<method>/t2_e<epoch>.json` — coords [layer][obs].
-  - `tsne/t1_<layer>_trails.json`, `tsne/t2_e<epoch>_trails.json` — bundled polylines per strength.
-- [ ] 5.2 Image sprite sheet (`sprites.png`, 1000 thumbnails) per dataset for hover details.
-- [ ] 5.3 Write everything to `app/data/<dataset>/<model>/`.
+- [x] 5.1 Define the JSON schema (document it in README):
+  > note: schema in README "Site data files". y is flipped at export (SVG y-down); coordinates int 0–9999;
+  > probabilities per mille. `sampleOrder` is the same for MLP and CNN of a dataset.
+  - `app/data/index.json` — available datasets × models × projections, sprite info (replaces a server route).
+  - `meta.json` — dataset, model, classes, architecture (names, widths, types, dropout), epochs,
+    learning curves (`history.json`), final metrics.
+  - `nodes.json` — per observation: true label, test-set index, nested sample order (`VIS_PLAN.md` D10),
+    per-epoch `pred` and softmax `probs`.
+  - `coords_<method>.json` — all T1 and T2 frames of one configuration (needed together: filmstrip, separation bars).
+  - `trails/t1_<layer>.json`, `trails/t2_e<epoch>.json` — bundled t-SNE polylines per strength, loaded on demand.
+- [x] 5.2 Image sprite sheet (`sprites.png`, 1000 thumbnails) per dataset for hover details.
+  > note: 40 columns, native size (MNIST 28 px grayscale, others 32 px RGB), ≤ 2.2 MB.
+- [x] 5.3 Write everything to `app/data/<dataset>/<model>/`.
+  > note: `python -m pipeline.export` (~1 min). 118 JSON + 3 PNG, **66 MB total**, largest file 2.2 MB (sprites) /
+  > 1.2 MB (coords). Verified: all JSON parse, coords and trail endpoints match `raw/`, preds match snapshots,
+  > probability sums 997–1003 ‰, sample-order prefixes balanced.
 
-## Phase 6 — Flask app
+## Phase 6 — Static site skeleton & deployment
 
-- [ ] 6.1 `app.py`: index route + static serving of `app/data/**`; a `/api/configs` route listing available configs.
-- [ ] 6.2 `index.html` layout: header with dataset/model selectors; two tabs/panels **T1 Epochs** and **T2 Layers**.
+- [x] 6.1 `app/index.html` + `css/style.css`: three-column layout of `VIS_PLAN.md` §2 with empty panels.
+  > note: panel style after `style-references/` (VISTA-like: white panels, thin borders, small uppercase titles with a
+  > square glyph). CSS tokens on `:root`; `.info` class for ⓘ icons; `.loading`/`.error` states. Model metrics and
+  > Data point are `<details>` (collapsible without JS). Checked with headless Edge at 1920×1080 and 1150 px (stacked).
+- [x] 6.2 Vendor D3 v7 (`app/js/vendor/d3.v7.9.0.min.js`, pinned 7.9.0) so the in-class demo also works offline.
+  > note: loaded as a classic script → global `d3` in the modules.
+- [x] 6.3 `js/data.js`: loads `index.json` and the per-view files with `fetch` (relative URLs, cached per view).
+  > note: decodes into typed arrays once: `Index` (+ `sprite()` CSS helper), `Config` (`sample(n)`, `pred`, `probsOf`,
+  > `epochIndex`, `lastHiddenLayer`), `Coords` (`frame(mode, …)`, `sequence(mode, …)`), `Trails` (`trail`, `stepOf`).
+  > All 6 configs load + decode in < 1 s. Tested in Node against a local server (scratch test, not in repo).
+- [x] 6.4 `js/state.js`: the shared state + change notifications of `VIS_PLAN.md` §3 (single source of truth).
+  > note: `store.set(patch)`, `store.subscribe(fn, keys)`, `store.toggleInSet(key, v, {exclusive})`. `epoch` holds the
+  > epoch *value*; `layer`/`epoch` null = not set yet (main.js fills last hidden layer / last epoch after loading).
+  > Reset rules: dataset → selections + classFilter + layer; model → selections + layer; projection → selections.
+- [x] 6.5 Local run: `python -m http.server -d app` (needed because `fetch` does not work from `file://`).
+  > note: documented in README "Run the site". `main.js` = entry point (loads the selected config, generated title,
+  > loading/error states); `window.app` exposes `{data, store, current}` for the console.
+- [~] 6.6 GitHub Pages: `.github/workflows/pages.yml` uploads `app/` (repo setting: Pages → Source: GitHub Actions).
+  > note: Pages serves the site under `/visual-learning/`, so every URL in the code must be relative.
+  > note: workflow written (triggers on pushes to `main` touching `app/`, or manually). Not run yet: needs the one-time
+  > repo setting + a push by the user.
 
 ## Phase 7 — D3 visualizations
 
@@ -160,37 +195,34 @@ visual-learning/
 > architecture (click layer → layer view), learning curve, embeddings view (+ layer/epoch steppers, play), image view
 > (brush-linked), model metrics (per-epoch confusion matrix, per-class bars), data-point panel (softmax probs).
 
-Shared scatter component: points colored by true class (categorical palette, 10 classes),
-misclassified points drawn as **triangles colored by predicted class** (paper convention).
+One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds the details. [M] items first,
+[S] items after the [M] items of all panels work.
 
-- [ ] 7.1 **T1 — Inter-epoch view**
-  - Main scatter of the selected epoch; **animated transitions** (`d3.transition`) when the epoch changes.
-  - Epoch slider + Play/Pause (animation through all snapshots).
-  - Trail layer: bundled trails, hue = class, lightness = epoch (dark = early, bright = late), toggle on/off.
-  - Linked **learning curve** (train/test accuracy & loss vs epoch) with the current epoch marked; clicking the curve jumps to that epoch.
-  - Small multiples of a few epochs (overview).
-- [ ] 7.2 **T2 — Inter-layer view**
-  - Same structure, with a layer slider instead of epochs ("forward propagation" animation).
-  - Small multiples `A_p[1] … A_p[L]` beside the bundled trail image (as in Figure 1).
-  - Before/after-training toggle (epoch 0 vs final).
-- [ ] 7.3 **Interaction** (mandatory; follows the mantra)
-  - *Overview:* small multiples + bundled trails.
-  - *Zoom & filter:* `d3.zoom` pan/zoom; click legend to filter/isolate classes; brush to select a group;
-    "show only misclassified" toggle; bundling-strength selector.
-  - *Details on demand:* `mouseover` tooltip with image thumbnail, true/predicted label, confidence;
-    `click` a point to pin it and highlight its full trajectory across epochs/layers in all views.
-- [ ] 7.4 NH and accuracy shown next to each projection.
-- [ ] 7.5 Visual polish: consistent color palette, legends, axis-free scatter, readable at projector resolution.
+- [ ] 7.1 Controls panel (§5.1): dataset, dim. red., ANN, view by, sample size, color by, bundling.
+- [ ] 7.2 Embeddings view, scatter mode (§5.4, §4.1–4.2): circles/triangles, title, legend filter, zoom/pan,
+      brush, tooltip with thumbnail, pin; NH + sample-acc badges computed in the browser.
+- [ ] 7.3 Steppers + animation (§5.5, §6): layer/epoch rows, Play/speed on the active row, animated transitions;
+      then the canvas filmstrip [S].
+- [ ] 7.4 Path view (§4.3, §5.4): trails at none/medium/strong, draw-in animation, pinned unbundled trajectory.
+- [ ] 7.5 Learning curve (§5.3) and architecture panel (§5.2, click → T2; separation bars [S]).
+- [ ] 7.6 Model metrics (§5.7): per-epoch confusion matrix with cell filter, per-class bars.
+- [ ] 7.7 Image view (§5.6) and data-point panel (§5.8), both linked to the scatter.
+- [ ] 7.8 [S] items of §12 (color-by modes, ghost bars, learned-at chart, keyboard, filter chips, …).
+- [ ] 7.9 Polish against `style-references/`; projector check (1920×1080); ⓘ icons instead of text on plots;
+      empty/loading states (§9).
 
 ## Phase 8 — Documentation & delivery
 
-- [ ] 8.1 `README.md`: how to run (Colab + local Flask), data schema, **design rationale** (why t-SNE,
-      joint vs chained projection, bundling + animation, color/glyph encodings, interaction mapping to mantra).
+- [ ] 8.1 `README.md`: link to the GitHub Pages site, how to run (Colab training, local pipeline, local server),
+      data schema, **design rationale** (why t-SNE, joint vs chained projection, bundling + animation,
+      color/glyph encodings, interaction mapping to mantra).
 - [ ] 8.2 Findings write-up per dataset (compare with paper: untrained MLP already separates MNIST; later layers
       separate better; SVHN light/dark-background split; CIFAR-10 confusion zone; early epochs at center of T1).
-- [ ] 8.3 Test the app end-to-end on a clean venv (`pip install -r requirements.txt && python app/app.py`).
-- [ ] 8.4 Build the submission ZIP (Flask app + data files; exclude `.venv`, `raw/`).
-- [ ] 8.5 Prepare the in-class presentation (live demo script + 3–5 key insights).
+- [ ] 8.3 Test end-to-end: deployed Pages site + local `python -m http.server -d app`, in Chrome and Firefox.
+- [ ] 8.4 Build the submission ZIP (`app/` = site + data files; exclude `.venv`, `raw/`).
+- [ ] 8.5 *(optional)* `app.py`: ~10-line Flask wrapper serving `app/` as static files, only if the course insists
+      on a Flask app in the ZIP.
+- [ ] 8.6 Prepare the in-class presentation (live demo script + 3–5 key insights; keep a local copy for offline use).
 
 ## Stretch (only if time allows)
 
@@ -213,3 +245,7 @@ misclassified points drawn as **triangles colored by predicted class** (paper co
 | 2026-11-09 | Claude | Reviewed UI drafts v1 → v2 (`drafts/`); feedback on missing pieces given in chat. |
 | 2026-11-09 | Claude | Wrote `VIS_PLAN.md` (visualization design spec from draft-v2 + review); awaiting feasibility review by code agent. |
 | 2026-11-09 | Claude | Feasibility review written into `VIS_PLAN.md` §11 (+ §6, §10, ⓘ-icon rule) and Phases 3–5. Phase 3 done: `pipeline/project.py`, t-SNE + PCA for all 6 configs, NH, sanity plots. PCA switched to per-frame log1p + Procrustes chain after visual checks. Next: Phase 4 (bundling). |
+| 2026-11-09 | Claude | Phase 4 done: `pipeline/bundle.py` (class-aware KDEEB, medium/strong, uint16), trails for all 6 configs, visually checked. Next: Phase 5 (export). |
+| 2026-11-09 | Claude | Plan revised: Flask dropped → static site in `app/` deployed on GitHub Pages (optional Flask wrapper, 8.5). Phases 6–8 rewritten; Phase 7 now one item per `VIS_PLAN.md` panel. `app/` skeleton restructured. |
+| 2026-11-09 | Claude | Phase 5 done: `pipeline/export.py` → `app/data/` (index, meta, nodes, coords per method, trails per view, sprites; 66 MB), verified, schema in README. Next: Phase 6 (site skeleton + Pages). |
+| 2026-11-09 | Claude | Phase 6 done except the first Pages deploy (6.6, needs user): layout, vendored D3 7.9.0, `data.js`, `state.js`, `main.js`, Pages workflow; Node tests + headless-Edge screenshots. Default branch is `main` (README links fixed). Next: Phase 7.1 (controls). |

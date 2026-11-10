@@ -14,7 +14,7 @@ Priority tags used below: **[M]** must (needed for the grading criteria) · **[S
 ## 1. Purpose, audience, message
 
 - **Audience:** classmates and instructor during a live in-class demo (projector, ~1920×1080, viewed from a
-  distance), plus the grader opening the Flask app alone. Assumed to know what a neural network is, not to know t-SNE.
+  distance), plus the grader opening the site (GitHub Pages link) alone. Assumed to know what a neural network is, not to know t-SNE.
 - **Message:** *"A network learns by gradually pulling same-class observations together — over epochs (T1)
   and, inside a trained network, layer after layer (T2). Where classes stay mixed, the model makes its mistakes."*
 - **Tasks (assignment):**
@@ -126,7 +126,8 @@ interaction is automatically linked).
 
 ### 4.3 Trails (path view, `All`)
 - One polyline per observation through its positions over the active dimension (epochs in T1, layers in T2),
-  bundled at the selected strength.
+  bundled at the selected strength. Bundling is **per class** (a trail is only attracted by trails of its own
+  class), so a bundle never mixes hues.
 - **Hue = true class; lightness = progress:** the start of the trail is the class color mixed 60 % with
   near-black, the end is the pure class color (paper Figure 1: "layer 1 → layer 4" dark→light).
   Stroke 1 px, opacity 0.25 (0.6 when filtered-in, 0.04 when filtered-out).
