@@ -10,7 +10,8 @@ const MATRIX_INFO = "Rows: true class · columns: predicted class. Color: share 
 const METRICS = [{ id: "recall", name: "Recall (class accuracy)" }, { id: "precision", name: "Precision" },
   { id: "f1", name: "F1" }];
 const M = { left: 40, top: 30 };                         // matrix header sizes
-const BARS = { height: 132, top: 8, bottom: 26, left: 28, right: 4 };
+const BARS = { top: 8, bottom: 26, left: 28, right: 4, min: 90, max: 160 };  // height = 30 % of the panel
+const HEADS = 64;   // px of the two panel-internal headers
 const pct = d3.format(".0%");
 
 /** Builds the panel inside `container`. Returns { setConfiguration(view) }. */
@@ -70,7 +71,10 @@ export function initModelMetrics(container, { store }) {
   function render(state, changed = new Set()) {
     if (!isReady(state)) return;
     width = container.clientWidth - 20;
-    if (width <= 0) return;
+    const bodyHeight = container.clientHeight - 16;
+    if (width <= 0 || bodyHeight <= 0) return;
+    // No scrolling (draft-v2): the matrix and the bars share the panel height.
+    const barsHeight = Math.max(BARS.min, Math.min(BARS.max, Math.round(bodyHeight * 0.3)));
     const { config } = view;
     const n = config.nClasses;
     const e = config.epochIndex(state.epoch);
@@ -84,7 +88,7 @@ export function initModelMetrics(container, { store }) {
     metricSelect.property("value", state.metric);
 
     // ---------------------------------------------------------------- matrix
-    const cell = Math.floor((width - M.left) / n);
+    const cell = Math.max(8, Math.floor(Math.min((width - M.left) / n, (bodyHeight - HEADS - barsHeight - M.top) / n)));
     matrixSvg.attr("width", M.left + n * cell).attr("height", M.top + n * cell);
     const rowTotal = d3.range(n).map((t) => d3.sum(d3.range(n), (p) => counts[t * n + p]));
     const cells = [];
@@ -117,7 +121,8 @@ export function initModelMetrics(container, { store }) {
       .call((h) => h.select("text").attr("x", 12).attr("dy", "0.35em").text((d) => shortName(d.name)));
     header(colHeads).attr("transform", (d) => `translate(${M.left + d.cls * cell + cell / 2},0)`)
       .call((h) => h.select("circle").attr("cy", 7))
-      .call((h) => h.select("text").attr("y", 24).attr("text-anchor", "middle").text((d) => shortName(d.name)));
+      .call((h) => h.select("text").attr("y", 24).attr("text-anchor", "middle")
+        .text((d) => (cell >= 24 ? shortName(d.name) : "")));   // narrow cells: chips only (name in the tooltip)
 
     const cellSel = cellsG.selectAll(".mm-cell").data(cells, (c) => `${c.t},${c.p}`)
       .join((enter) => {
@@ -170,9 +175,9 @@ export function initModelMetrics(container, { store }) {
     const values = scores[state.metric];
     const ghost = final[state.metric];
     const bw = width;
-    barsSvg.attr("width", bw).attr("height", BARS.height);
+    barsSvg.attr("width", bw).attr("height", barsHeight);
     const x = d3.scaleBand().domain(d3.range(n)).range([BARS.left, bw - BARS.right]).padding(0.18);
-    const y = d3.scaleLinear().domain([0, 1]).range([BARS.height - BARS.bottom, BARS.top]);
+    const y = d3.scaleLinear().domain([0, 1]).range([barsHeight - BARS.bottom, BARS.top]);
     barsAxis.attr("transform", `translate(${BARS.left},0)`)
       .call(d3.axisLeft(y).ticks(2).tickFormat(d3.format(".1f")).tickSizeOuter(0));
     const bars = barsG.selectAll(".mm-bar").data(d3.range(n)).join((enter) => {
@@ -203,7 +208,7 @@ export function initModelMetrics(container, { store }) {
     bars.select(".mm-ghost").attr("x", (c) => x(c) - 0.5).attr("width", x.bandwidth() + 1)
       .attr("y", (c) => y(Number.isNaN(ghost[c]) ? 0 : ghost[c])).attr("height", 1.5);
     barLabels.selectAll("text").data(d3.range(n)).join("text")
-      .attr("x", (c) => x(c) + x.bandwidth() / 2).attr("y", BARS.height - BARS.bottom + 12)
+      .attr("x", (c) => x(c) + x.bandwidth() / 2).attr("y", barsHeight - BARS.bottom + 12)
       .attr("text-anchor", "middle").classed("off", (c) => !inFilter(c))
       .text((c) => shortName(names[c]));
   }

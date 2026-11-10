@@ -1,25 +1,28 @@
-// Image view (VIS_PLAN.md §5.6) with the active-filter chips (§3): thumbnails of the points that pass the filters
-// (brushed / confusion cell / classes; a random sample when nothing is filtered), linked both ways to the scatter.
+// Image view (VIS_PLAN.md §5.6, drafts/draft-v2.png): thumbnails of the points that pass the filters (brushed /
+// confusion cell / classes; a random sample when nothing is filtered), linked both ways to the scatter. No
+// scrolling: the thumbnails are sized to fill the panel height and the set is paged. The active-filter chips, sort
+// and pager live in the panel title.
 import { CLASS_COLORS, shortName } from "./encoding.js";
 import { filtersActive, passes } from "./scatter.js";
 
-const THUMB = 48;
-const GAP = 4;
-const INITIAL_ROWS = 2;
-const MORE = 100;   // thumbnails added per "show more" click
+const GAP = 6;
+const TARGET = 84;          // preferred thumbnail size (px); the actual size fills the panel height exactly
+const MAX_THUMB = 104;
 const SORTS = [{ id: "wrong", name: "misclassified first" }, { id: "confidence", name: "least confident first" }];
 
-/** Builds the view inside `container`; `subtitle` names the image source. Returns { setConfiguration(view) }. */
-export function initImages(container, { store, subtitle }) {
+/**
+ * Builds the view inside `container`; `subtitle` names the image source and `tools` (panel title) holds the chips,
+ * sort, reshuffle and pager. Returns { setConfiguration(view) }.
+ */
+export function initImages(container, { store, subtitle, tools }) {
   let view = null;
   let sort = "wrong";
   let seed = 1;
-  let limit = 0;
+  let page = 0;
   let orderKey = null;
   let order = [];
 
-  const root = d3.select(container).append("div").attr("class", "images");
-  const bar = root.append("div").attr("class", "img-bar");
+  const bar = d3.select(tools);
   const chips = bar.append("div").attr("class", "chips");
   const sortSelect = bar.append("select").attr("class", "control-input img-sort").attr("aria-label", "Sort images")
     .on("change", (event) => { sort = event.target.value; render(store.state); });
@@ -27,9 +30,14 @@ export function initImages(container, { store, subtitle }) {
   const reshuffle = bar.append("button").attr("type", "button").attr("class", "tool-btn tool-icon")
     .attr("title", "New random sample").attr("aria-label", "New random sample").text("⟳")
     .on("click", () => { seed++; render(store.state); });
-  const grid = root.append("div").attr("class", "img-grid");
-  const more = root.append("button").attr("type", "button").attr("class", "tool-btn img-more").text("show more")
-    .on("click", () => { limit += MORE; render(store.state, new Set(), { keepOrder: true }); });
+  const pager = bar.append("div").attr("class", "seg pager").attr("role", "group").attr("aria-label", "Pages");
+  const prev = pager.append("button").attr("type", "button").attr("aria-label", "Previous page").text("‹")
+    .on("click", () => { page--; render(store.state); });
+  const pageText = pager.append("span").attr("class", "pager-text");
+  const next = pager.append("button").attr("type", "button").attr("aria-label", "Next page").text("›")
+    .on("click", () => { page++; render(store.state); });
+
+  const grid = d3.select(container).append("div").attr("class", "img-grid");
 
   const isReady = (state) => view && view.dataset === state.dataset && view.model === state.model
     && state.epoch !== null;
@@ -56,7 +64,7 @@ export function initImages(container, { store, subtitle }) {
         clear: { cellFilter: null } });
     }
     if (state.classFilter) {
-      const names = [...state.classFilter].sort((a, b) => a - b).map((c) => classes[c]).join(", ");
+      const names = [...state.classFilter].sort((a, b) => a - b).map((c) => shortName(classes[c])).join(", ");
       list.push({ key: "class", text: `class: ${names}`, clear: { classFilter: null } });
     }
     const chip = chips.selectAll(".chip-filter").data(list, (d) => d.key).join((enter) => {
@@ -70,7 +78,17 @@ export function initImages(container, { store, subtitle }) {
       .on("click", (event, d) => store.set(d.clear));
   }
 
-  function render(state, changed = new Set(), { keepOrder = false } = {}) {
+  /** Thumbnail size and page size that fill the panel without scrolling. */
+  function geometry() {
+    const w = container.clientWidth - 20;    // content box (panel-body padding 8 px × 10 px)
+    const h = container.clientHeight - 16;
+    const rows = Math.max(1, Math.round((h + GAP) / (TARGET + GAP)));
+    const size = Math.max(24, Math.min(MAX_THUMB, Math.floor((h + GAP) / rows) - GAP));
+    const columns = Math.max(1, Math.floor((w + GAP) / (size + GAP)));
+    return { size, perPage: rows * columns };
+  }
+
+  function render(state) {
     if (!isReady(state)) return;
     const { config, index, dataset, spriteUrl } = view;
     const e = config.epochIndex(state.epoch);
@@ -83,48 +101,61 @@ export function initImages(container, { store, subtitle }) {
     const key = [dataset, view.model, state.sampleSize, state.brushed ? [...state.brushed].join() : "",
       JSON.stringify(state.cellFilter), state.classFilter ? [...state.classFilter].join() : "", sort, seed,
       state.cellFilter ? state.epoch : ""].join("|");
-    if (key !== orderKey && !keepOrder) {
+    if (key !== orderKey) {
       orderKey = key;
+      page = 0;
       let ids = Array.from(config.sample(state.sampleSize)).filter((id) => passes(datum(id), state));
       if (!filtersActive(state)) ids = d3.shuffler(d3.randomLcg(seed / 1000))(ids);
       const conf = (id) => config.probs[e][id * config.nClasses + preds[id]];
-      if (sort === "wrong") ids = d3.sort(ids, (id) => (preds[id] === config.labels[id] ? 1 : 0));
-      else ids = d3.sort(ids, conf);
+      ids = sort === "wrong" ? d3.sort(ids, (id) => (preds[id] === config.labels[id] ? 1 : 0)) : d3.sort(ids, conf);
       order = ids;
-      const columns = Math.max(1, Math.floor((grid.node().clientWidth + GAP) / (THUMB + GAP)));
-      limit = columns * INITIAL_ROWS;
     }
     d3.select(subtitle).text(sourceText(state, order.length));
 
-    const shownIds = order.slice(0, limit);
-    const thumbs = grid.selectAll(".img-thumb").data(shownIds, (id) => id).join((enter) => {
-      const t = enter.append("button").attr("type", "button").attr("class", "img-thumb thumb")
-        .on("mouseenter", (event, id) => store.set({ hovered: id }))
-        .on("mouseleave", (event, id) => { if (store.get("hovered") === id) store.set({ hovered: null }); })
-        .on("click", (event, id) => store.set({ pinned: store.get("pinned") === id ? null : id }));
-      t.append("span").attr("class", "img-truth");
-      t.append("span").attr("class", "img-badge");
-      return t;
-    }).order();
-    thumbs.each(function (id) { Object.assign(this.style, index.sprite(dataset, id, THUMB, spriteUrl)); })
+    const { size, perPage } = geometry();
+    const pages = Math.max(1, Math.ceil(order.length / perPage));
+    page = Math.max(0, Math.min(page, pages - 1));
+    const first = page * perPage;
+    const shownIds = order.slice(first, first + perPage);
+    prev.property("disabled", page === 0);
+    next.property("disabled", page >= pages - 1);
+    pageText.text(order.length ? `${first + 1}–${first + shownIds.length} / ${order.length}` : "0");
+    pager.style("display", pages > 1 ? null : "none");
+
+    const thumbs = grid.style("--thumb", `${size}px`).selectAll(".img-thumb").data(shownIds, (id) => id)
+      .join((enter) => {
+        const t = enter.append("button").attr("type", "button").attr("class", "img-thumb thumb")
+          .on("mouseenter", (event, id) => store.set({ hovered: id }))
+          .on("mouseleave", (event, id) => { if (store.get("hovered") === id) store.set({ hovered: null }); })
+          .on("click", (event, id) => store.set({ pinned: store.get("pinned") === id ? null : id }));
+        const tag = t.append("span").attr("class", "img-tag");
+        tag.append("span").attr("class", "chip");
+        tag.append("span").attr("class", "img-tag-text");
+        t.append("span").attr("class", "img-badge");
+        return t;
+      })
+      .order();
+    thumbs.each(function (id) { Object.assign(this.style, index.sprite(dataset, id, size, spriteUrl)); })
       .attr("aria-label", (id) => `#${id}, true ${config.classes[config.labels[id]]}`)
+      .classed("wrong", (id) => preds[id] !== config.labels[id])
       .classed("hovered", (id) => id === state.hovered)
       .classed("pinned", (id) => id === state.pinned);
-    thumbs.select(".img-truth").style("background", (id) => CLASS_COLORS[config.labels[id]]);
+    // Draft-v2: true label (chip + name) in the bottom-right corner; the prediction, if wrong, in the top-right one.
+    thumbs.select(".img-tag .chip").style("background", (id) => CLASS_COLORS[config.labels[id]]);
+    thumbs.select(".img-tag-text").text((id) => shortName(config.classes[config.labels[id]]));
     thumbs.select(".img-badge")
       .style("display", (id) => (preds[id] === config.labels[id] ? "none" : null))
       .style("--badge", (id) => CLASS_COLORS[preds[id]])
       .attr("title", (id) => `predicted ${config.classes[preds[id]]}`)
-      .text((id) => shortName(config.classes[preds[id]]).slice(0, 2));
-    more.style("display", order.length > limit ? null : "none")
-      .text(`show more (${Math.min(MORE, order.length - limit)})`);
+      .text((id) => `▲ ${shortName(config.classes[preds[id]])}`);
   }
 
+  new ResizeObserver(() => render(store.state)).observe(container);
   store.subscribe(render, ["epoch", "sampleSize", "brushed", "cellFilter", "classFilter", "hovered", "pinned"]);
 
   return {
-    setConfiguration(next) {
-      view = next;
+    setConfiguration(nextView) {
+      view = nextView;
       orderKey = null;
       render(store.state);
     },

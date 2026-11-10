@@ -78,18 +78,34 @@ async function loadConfiguration(state) {
   }
 }
 
+/** Collapsible panels (draft-v2 ▾): the title toggles the panel; the other panel of the column takes the space. */
+function initCollapsible() {
+  for (const button of document.querySelectorAll(".collapsible .collapse-btn")) {
+    button.addEventListener("click", () => {
+      const panel = button.closest(".collapsible");
+      const collapsed = panel.classList.toggle("collapsed");
+      button.setAttribute("aria-expanded", String(!collapsed));
+    });
+  }
+}
+
 async function main() {
+  initCollapsible();
   current.index = await data.index();
   initControls(document.getElementById("controls"), { store, index: current.index });
   panels.push(
-    initScatter(plot, { store, data, tools: document.getElementById("embeddings-tools") }),
+    initScatter(plot, {
+      store, data, tools: document.getElementById("embeddings-tools"), overlay: document.getElementById("steppers"),
+    }),
     initSteppers(document.getElementById("steppers"), { store }),
     initArchitecture(document.getElementById("architecture"), {
-      store, subtitle: document.getElementById("architecture-model"),
+      store, subtitle: document.getElementById("architecture-model"), tools: document.getElementById("architecture-tools"),
     }),
     initCurve(document.getElementById("learning-curve"), { store, tools: document.getElementById("curve-tools") }),
     initModelMetrics(document.getElementById("metrics"), { store }),
-    initImages(document.getElementById("images"), { store, subtitle: document.getElementById("images-source") }),
+    initImages(document.getElementById("images"), {
+      store, subtitle: document.getElementById("images-source"), tools: document.getElementById("images-tools"),
+    }),
     initDataPoint(document.getElementById("datapoint"), { store }),
   );
   store.subscribe(loadConfiguration, ["dataset", "model", "projection"]);

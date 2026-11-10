@@ -4,8 +4,9 @@
 import { CLASS_COLORS, MOVE_MS, ms, shortName } from "./encoding.js";
 import { tooltip } from "./ui.js";
 
-const SOFTMAX = { height: 112, top: 8, bottom: 22, left: 28, right: 4 };
-const LEARNED = { height: 112, top: 18, bottom: 22, left: 28, right: 10 };
+const SOFTMAX = { top: 8, bottom: 22, left: 28, right: 4 };
+const LEARNED = { top: 18, bottom: 22, left: 28, right: 10, min: 70 };  // hidden when the panel is too short
+const FIXED = 128;   // px of the header (72 px thumbnail) and the two chart titles
 
 /** Builds the panel inside `container`. Returns { setConfiguration(view) }. */
 export function initDataPoint(container, { store }) {
@@ -34,7 +35,7 @@ export function initDataPoint(container, { store }) {
   const softBars = softSvg.append("g");
   const softLabels = softSvg.append("g").attr("class", "mm-bar-labels");
 
-  body.append("div").attr("class", "dp-title").text("When was it learned?");
+  const learnTitle = body.append("div").attr("class", "dp-title").text("When was it learned?");
   const learnSvg = body.append("svg").attr("class", "dp-learned");
   const learnAxisX = learnSvg.append("g").attr("class", "axis");
   const learnAxisY = learnSvg.append("g").attr("class", "axis");
@@ -60,9 +61,16 @@ export function initDataPoint(container, { store }) {
     const pred = config.pred(state.epoch, id);
     const probs = config.probsOf(state.epoch, id);
     const width = Math.max(0, container.clientWidth - 20);
+    // No scrolling (draft-v2): the two charts share the height left by the header (softmax first).
+    const free = Math.max(0, container.clientHeight - 16 - FIXED);
+    const showLearned = free * 0.45 >= LEARNED.min;
+    const softHeight = Math.max(60, Math.round(showLearned ? free * 0.55 : free));
+    const learnHeight = Math.round(free * 0.45);
+    learnTitle.style("display", showLearned ? null : "none");
+    learnSvg.style("display", showLearned ? null : "none");
     const duration = changed.has("epoch") ? ms(MOVE_MS) / (state.playing ? state.speed : 1) : 0;
 
-    Object.assign(thumb.node().style, index.sprite(dataset, id, 96, spriteUrl));
+    Object.assign(thumb.node().style, index.sprite(dataset, id, 72, spriteUrl));
     idLine.text(`#${id} · test image ${config.testIndex[id]}`);
     const chipRow = (sel, text, cls) => {
       sel.selectAll("*").remove();
@@ -75,9 +83,9 @@ export function initDataPoint(container, { store }) {
     actions.select(".dp-unpin").style("display", state.pinned === null ? "none" : null);
 
     // Softmax bars: class colors, the true class outlined (§5.8).
-    softSvg.attr("width", width).attr("height", SOFTMAX.height);
+    softSvg.attr("width", width).attr("height", softHeight);
     const x = d3.scaleBand().domain(d3.range(n)).range([SOFTMAX.left, width - SOFTMAX.right]).padding(0.18);
-    const y = d3.scaleLinear().domain([0, 1]).range([SOFTMAX.height - SOFTMAX.bottom, SOFTMAX.top]);
+    const y = d3.scaleLinear().domain([0, 1]).range([softHeight - SOFTMAX.bottom, SOFTMAX.top]);
     softAxis.attr("transform", `translate(${SOFTMAX.left},0)`)
       .call(d3.axisLeft(y).ticks(2).tickFormat(d3.format(".1f")).tickSizeOuter(0));
     softBars.selectAll("rect").data(d3.range(n)).join("rect")
@@ -87,15 +95,15 @@ export function initDataPoint(container, { store }) {
       .transition("bar").duration(duration).ease(d3.easeCubicInOut)
       .attr("y", (c) => y(probs[c])).attr("height", (c) => y(0) - y(probs[c]));
     softLabels.selectAll("text").data(d3.range(n)).join("text")
-      .attr("x", (c) => x(c) + x.bandwidth() / 2).attr("y", SOFTMAX.height - SOFTMAX.bottom + 12)
+      .attr("x", (c) => x(c) + x.bandwidth() / 2).attr("y", softHeight - SOFTMAX.bottom + 12)
       .attr("text-anchor", "middle").classed("strong", (c) => c === label)
       .text((c) => shortName(config.classes[c]));
 
     // p(true class) over the snapshot epochs, with the 0.5 reference and the current-epoch rule.
-    learnSvg.attr("width", width).attr("height", LEARNED.height);
+    learnSvg.attr("width", width).attr("height", learnHeight);
     const series = config.epochs.map((epoch) => ({ epoch, p: config.probsOf(epoch, id)[label] }));
     const lx = d3.scaleLinear().domain(d3.extent(config.epochs)).range([LEARNED.left, width - LEARNED.right]);
-    const ly = d3.scaleLinear().domain([0, 1]).range([LEARNED.height - LEARNED.bottom, LEARNED.top]);
+    const ly = d3.scaleLinear().domain([0, 1]).range([learnHeight - LEARNED.bottom, LEARNED.top]);
     learnAxisX.attr("transform", `translate(0,${ly(0)})`).call(d3.axisBottom(lx).ticks(5).tickSizeOuter(0));
     learnAxisY.attr("transform", `translate(${LEARNED.left},0)`)
       .call(d3.axisLeft(ly).ticks(2).tickFormat(d3.format(".1f")).tickSizeOuter(0));

@@ -2,6 +2,8 @@
 // Every observation is an SVG group keyed by its id, so selections survive epoch/layer changes and the points can
 // move between frames. Positions live in "base" pixels; zoom/pan transforms the whole layer and scales every glyph
 // back by 1/k, so marks keep a constant size while zooming. The path view (`All`) draws the trails of paths.js on top.
+// Layout as in drafts/draft-v2.png: the plot fills the panel, legend inside at the bottom-left, steppers (an overlay
+// owned by steppers.js) at the bottom-right; the data square (same scale on both axes) stays clear of the steppers.
 import { frameOf } from "./data.js";
 import { CLASS_COLORS, INK, CORRECT_GRAY, MOVE_MS, learnedColor, ms, pointStyle } from "./encoding.js";
 import { cachedNeighborhoodHit, sampleAccuracy } from "./metrics.js";
@@ -18,6 +20,8 @@ const HOVER_DELAY = 80;    // ms before the tooltip appears
 const TRAIL_HIT_PX = 8;    // hover distance to a trail in the path view
 const NH_K = 6;
 const LEGEND_MARGIN = 8;   // px between the legend and the plot frame
+const LEGEND_MIN_PLOT = 480; // plot height (px) below which the legend starts collapsed
+const OVERLAY_MARGIN = 10; // px around the steppers overlay (keep in sync with #steppers in CSS)
 const COMET = [0.5, 0.32, 0.16];  // opacity of the pinned point's last positions during Play (§6)
 const DURATION = { swapOut: 200, swapIn: 200, sample: 300, fade: 250, reset: 400 };
 
@@ -47,13 +51,16 @@ export function passes(d, state, { ignoreClass = false } = {}) {
 export const filtersActive = (state) => Boolean(state.classFilter || state.cellFilter || state.brushed);
 
 /**
- * Builds the embeddings view inside `container` (#plot) and its toolbar inside `tools`; `data` loads the trails.
- * Returns { setConfiguration(view) }, called by main.js once a configuration's files are loaded.
+ * Builds the embeddings view inside `container` (#plot) and its toolbar inside `tools`; `data` loads the trails;
+ * `overlay` (the steppers) is kept clear of the data. Returns { setConfiguration(view) }, called by main.js.
  */
-export function initScatter(container, { store, data, tools }) {
+export function initScatter(container, { store, data, tools, overlay }) {
   let view = null;              // { index, config, coords, dataset, model, projection, spriteUrl }
   let shown = null;             // what is drawn: { key, layer, epoch, n }
-  let size = 0;
+  let width = 0;                // plot size in px (the whole panel body)
+  let height = 0;
+  let bandHeight = 0;           // steppers overlay (px), kept clear of the data
+  let bandWidth = 0;
   let radius = 3;
   let transform = d3.zoomIdentity;
   let brushMode = false;
@@ -101,10 +108,14 @@ export function initScatter(container, { store, data, tools }) {
   legendHeader.append("button").attr("type", "button").attr("class", "legend-toggle")
     .attr("aria-label", "Collapse legend")
     .on("click", () => {
-      const collapsed = !legend.classed("collapsed");
-      legend.classed("collapsed", collapsed);
-      legendHeader.select(".legend-toggle").attr("aria-label", collapsed ? "Expand legend" : "Collapse legend");
+      legendToggled = true;
+      setLegendCollapsed(!legend.classed("collapsed"));
     });
+  let legendToggled = false;   // once the user opens / closes the legend, the layout no longer decides
+  function setLegendCollapsed(collapsed) {
+    legend.classed("collapsed", collapsed);
+    legendHeader.select(".legend-toggle").attr("aria-label", collapsed ? "Expand legend" : "Collapse legend");
+  }
   const legendItems = legend.append("div").attr("class", "legend-items");
   const legendKey = legend.append("div").attr("class", "legend-key");
 
@@ -178,8 +189,8 @@ export function initScatter(container, { store, data, tools }) {
   let brushOrigin = null;
   const brushBox = (event) => {
     const [x0, y0] = brushOrigin;
-    const cx = Math.max(0, Math.min(size, event.x));
-    const cy = Math.max(0, Math.min(size, event.y));
+    const cx = Math.max(0, Math.min(width, event.x));
+    const cy = Math.max(0, Math.min(height, event.y));
     return [Math.min(x0, cx), Math.min(y0, cy), Math.max(x0, cx), Math.max(y0, cy)];
   };
   svg.call(d3.drag()
@@ -294,7 +305,7 @@ export function initScatter(container, { store, data, tools }) {
   }
 
   function render(state, changed = new Set()) {
-    if (swapping || !isReady(state) || size === 0) return;
+    if (swapping || !isReady(state) || width === 0) return;
     if (!shown || shown.key !== keyOf(state)) {
       swap();
       return;
@@ -451,7 +462,7 @@ export function initScatter(container, { store, data, tools }) {
     };
   }
 
-  const geometryKey = (state) => `${keyOf(state)}|${state.mode === "epoch" ? state.layer : state.epoch}|${size}`;
+  const geometryKey = (state) => `${keyOf(state)}|${state.mode === "epoch" ? state.layer : state.epoch}|${width}x${height}`;
 
   /** Unbundled step positions (base px) of every observation along the active dimension (cached). */
   function geometryFor(state) {
@@ -682,8 +693,7 @@ export function initScatter(container, { store, data, tools }) {
       .select(".legend-count").text((d) => visible.filter(d.count).length);
   }
 
-  // The legend starts in the free space left of the square plot when there is room (so it hides no points), else
-  // inside its top-left corner; it can be dragged by its header anywhere in the plot area.
+  // The legend starts at the bottom-left of the plot (draft-v2); it can be collapsed and dragged by its header.
   let legendDragged = false;
   legendHeader.call(d3.drag()
     .container(root.node())
@@ -693,35 +703,46 @@ export function initScatter(container, { store, data, tools }) {
       moveLegend(event.dx, event.dy);
     }));
 
-  const sideSpace = () => Math.max(0, Math.floor((container.clientWidth - size) / 2));
-
+  /** Default position, anchored at the bottom so that collapsing keeps the legend in its corner; on short plots
+   * (e.g. a 720 px projector) it starts collapsed so it hides no points. */
   function placeLegend() {
-    const width = legend.node().offsetWidth;
-    const outside = sideSpace() >= width + 2 * LEGEND_MARGIN;
-    legend.style("left", `${outside ? -(width + LEGEND_MARGIN) : LEGEND_MARGIN}px`)
-      .style("top", `${outside ? 0 : LEGEND_MARGIN}px`);
+    if (!legendToggled) setLegendCollapsed(height < LEGEND_MIN_PLOT);
+    // Bottom-left (draft-v2), unless the steppers reach that far left: then top-left.
+    const room = overlay ? overlay.getBoundingClientRect().left - container.getBoundingClientRect().left : width;
+    const fitsBottom = room >= legend.node().offsetWidth + 2 * LEGEND_MARGIN;
+    legend.style("left", `${LEGEND_MARGIN}px`)
+      .style("top", fitsBottom ? "auto" : `${LEGEND_MARGIN}px`)
+      .style("bottom", fitsBottom ? `${LEGEND_MARGIN}px` : "auto");
   }
 
   function moveLegend(dx = 0, dy = 0) {
     const node = legend.node();
-    const free = sideSpace();
-    const left = Math.max(-free, Math.min(size + free - node.offsetWidth, node.offsetLeft + dx));
-    const top = Math.max(0, Math.min(size - node.offsetHeight, node.offsetTop + dy));
-    legend.style("left", `${left}px`).style("top", `${top}px`);
+    const left = Math.max(0, Math.min(width - node.offsetWidth, node.offsetLeft + dx));
+    const top = Math.max(0, Math.min(height - node.offsetHeight, node.offsetTop + dy));
+    legend.style("left", `${left}px`).style("top", `${top}px`).style("bottom", "auto");
   }
 
-  // ------------------------------------------------------------------ layout (square plot, §2)
+  // ------------------------------------------------------------------ layout (§2: same scale on both axes)
   function layout() {
-    const { width, height } = container.getBoundingClientRect();
-    const next = Math.max(0, Math.floor(Math.min(width, height)));
-    if (next === size) return;
-    size = next;
-    root.style("width", `${size}px`).style("height", `${size}px`);
-    svg.attr("width", size).attr("height", size);
-    frameRect.attr("x", 0.5).attr("y", 0.5).attr("width", Math.max(0, size - 1)).attr("height", Math.max(0, size - 1));
-    x.range([PAD, size - PAD]);
-    y.range([PAD, size - PAD]);
-    zoom.extent([[0, 0], [size, size]]).translateExtent([[0, 0], [size, size]]);
+    const box = container.getBoundingClientRect();
+    const w = Math.max(0, Math.floor(box.width));
+    const h = Math.max(0, Math.floor(box.height));
+    const band = overlay ? overlay.offsetHeight + OVERLAY_MARGIN : 0;
+    const overlayWidth = overlay ? overlay.offsetWidth : 0;   // the legend placement depends on it
+    if (w === width && h === height && band === bandHeight && overlayWidth === bandWidth) return;
+    width = w;
+    height = h;
+    bandHeight = band;
+    bandWidth = overlayWidth;
+    svg.attr("width", width).attr("height", height);
+    frameRect.attr("x", 0.5).attr("y", 0.5).attr("width", Math.max(0, width - 1)).attr("height", Math.max(0, height - 1));
+    // The data square: as large as possible above the steppers band, centered horizontally.
+    const side = Math.max(0, Math.min(width, height - band) - 2 * PAD);
+    const x0 = (width - side) / 2;
+    const y0 = PAD + Math.max(0, (height - band - 2 * PAD - side) / 2);
+    x.range([x0, x0 + side]);
+    y.range([y0, y0 + side]);
+    zoom.extent([[0, 0], [width, height]]).translateExtent([[0, 0], [width, height]]);
     svg.call(zoom.transform, d3.zoomIdentity);
     if (legendDragged) moveLegend();
     else placeLegend();
@@ -739,7 +760,9 @@ export function initScatter(container, { store, data, tools }) {
       render(store.state);
     }
   }
-  new ResizeObserver(layout).observe(container);
+  const resizeObserver = new ResizeObserver(layout);
+  resizeObserver.observe(container);
+  if (overlay) resizeObserver.observe(overlay);
 
   store.subscribe(render, ["mode", "layer", "epoch", "sampleSize", "classFilter", "cellFilter", "brushed",
     "hovered", "pinned", "colorBy", "showAll", "bundling", "cellHover", "trajectory", "playing"]);

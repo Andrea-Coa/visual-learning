@@ -20,7 +20,7 @@
           <circle cx="16" cy="16" r="3"/><circle cx="25" cy="9" r="3"/><circle cx="25" cy="23" r="3"/>
           <path d="M7 9 16 16 7 23M25 9 16 16 25 23"/>
         </svg>
-        <h1>Visual Learning</h1>
+        <h1>Visual<br>Learning</h1>
       </header>
 
       <section class="panel" id="controls-panel">
@@ -28,8 +28,9 @@
         <div class="panel-body" id="controls"></div>
       </section>
 
-      <section class="panel panel-grow" id="architecture-panel">
-        <h2 class="panel-title">Architecture <span class="panel-subtitle" id="architecture-model"></span></h2>
+      <section class="panel" id="architecture-panel">
+        <h2 class="panel-title">Architecture <span class="panel-subtitle" id="architecture-model"></span>
+          <span class="panel-tools" id="architecture-tools"></span></h2>
         <div class="panel-body" id="architecture"></div>
       </section>
 
@@ -48,26 +49,28 @@
         </h2>
         <div class="panel-body embeddings-body">
           <div class="plot" id="plot"></div>
+          <!-- draft-v2: Layer / Epoch rows inside the plot, bottom-right -->
           <div class="steppers" id="steppers"></div>
         </div>
       </section>
 
       <section class="panel panel-images" id="images-panel">
-        <h2 class="panel-title">Image view <span class="panel-subtitle" id="images-source"></span></h2>
+        <h2 class="panel-title">Image view <span class="panel-subtitle" id="images-source"></span>
+          <span class="panel-tools" id="images-tools"></span></h2>
         <div class="panel-body" id="images"></div>
       </section>
     </main>
 
     <aside class="column column-right">
-      <details class="panel" id="metrics-panel" open>
-        <summary class="panel-title">Model metrics</summary>
+      <section class="panel collapsible" id="metrics-panel">
+        <h2 class="panel-title"><button type="button" class="collapse-btn" aria-expanded="true">Model metrics</button></h2>
         <div class="panel-body" id="metrics"></div>
-      </details>
+      </section>
 
-      <details class="panel panel-grow" id="datapoint-panel" open>
-        <summary class="panel-title">Data point</summary>
+      <section class="panel collapsible" id="datapoint-panel">
+        <h2 class="panel-title"><button type="button" class="collapse-btn" aria-expanded="true">Data point</button></h2>
         <div class="panel-body" id="datapoint"></div>
-      </details>
+      </section>
     </aside>
 
   </div>

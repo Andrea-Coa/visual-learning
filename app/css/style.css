@@ -30,17 +30,20 @@
 html, body {
   margin: 0;
   height: 100%;
+  overflow: hidden;            /* no scrolling: every panel fits the viewport */
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
   font-size: var(--fs-base);
 }
 
-/* ---------------------------------------------------------------- layout (VIS_PLAN.md §2) */
+/* ---------------------------------------------------------------- layout (drafts/draft-v2.png) */
 
+/* Proportions of the draft: columns 24 / 50 / 26 %; center 66 % embeddings + 34 % images; right 63 % metrics +
+   37 % data point; left: brand, controls, architecture, learning curve. Nothing scrolls. */
 .layout {
   display: grid;
-  grid-template-columns: var(--left-width) minmax(560px, 1fr) var(--right-width);
+  grid-template-columns: minmax(250px, 24fr) minmax(0, 50fr) minmax(280px, 26fr);
   grid-template-areas: "left center right";
   gap: var(--gap);
   height: 100vh;
@@ -58,34 +61,30 @@ html, body {
 .column-center { grid-area: center; }
 .column-right  { grid-area: right; }
 
-/* Below 1280 px the right column moves under the center one and the page scrolls. */
-@media (max-width: 1279px) {
-  .layout {
-    grid-template-columns: var(--left-width) minmax(0, 1fr);
-    grid-template-areas: "left center" "left right";
-    height: auto;
-    min-height: 100vh;
-  }
-  .column-center { min-height: 90vh; }
-  .column-right { flex-direction: row; flex-wrap: wrap; }
-  .column-right > .panel { flex: 1 1 300px; }
-}
+#controls-panel      { flex: none; }
+#architecture-panel  { flex: 107 1 0; }
+#curve-panel         { flex: 153 1 0; }
+#embeddings-panel    { flex: 66 1 0; }
+#images-panel        { flex: 34 1 0; }
+#metrics-panel       { flex: 63 1 0; }
+#datapoint-panel     { flex: 37 1 0; }
 
 /* ---------------------------------------------------------------- brand */
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 4px 2px;
+  gap: 12px;
+  padding: 6px 6px 4px;
 }
 .brand h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
+  line-height: 1.05;
   letter-spacing: 0.01em;
 }
-.brand-logo { width: 30px; height: 30px; flex: none; }
+.brand-logo { width: 44px; height: 44px; flex: none; }
 .brand-logo circle { fill: var(--ink); }
 .brand-logo path { fill: none; stroke: var(--ink); stroke-width: 1.4; }
 
@@ -99,10 +98,6 @@ html, body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
-.panel-grow { flex: 1 1 auto; }
-#controls-panel { flex: none; }
-#curve-panel { flex: 0 1 250px; min-height: 160px; }
-#architecture-panel { min-height: 120px; }
 
 .panel-title {
   display: flex;
@@ -137,28 +132,41 @@ html, body {
 .panel-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 
 .panel-body {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   padding: 8px 10px;
-  overflow: auto;
+  overflow: hidden;
 }
 
-/* Collapsible panels (<details>) */
-details.panel > summary { cursor: pointer; list-style: none; user-select: none; }
-details.panel > summary::-webkit-details-marker { display: none; }
-details.panel > summary::after {
+/* Collapsible panels (draft-v2 ▾) */
+.collapse-btn {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.collapse-btn::after {
   content: "";
   width: 6px;
   height: 6px;
-  margin-left: auto;
+  margin: 0 2px 3px auto;
   border-right: 1.5px solid var(--muted);
   border-bottom: 1.5px solid var(--muted);
   transform: rotate(45deg);
   transition: transform 150ms;
 }
-details.panel:not([open]) > summary::after { transform: rotate(-45deg); }
-details.panel:not([open]) { flex: none; }
-details.panel:not([open]) > summary { border-bottom: none; border-radius: var(--radius); }
+.collapsible.collapsed { flex: none !important; }
+.collapsible.collapsed > .panel-body { display: none; }
+.collapsible.collapsed .collapse-btn::after { margin-bottom: 0; transform: rotate(-45deg); }
+.collapsible.collapsed > .panel-title { border-bottom: none; border-radius: var(--radius); }
 
 /* ---------------------------------------------------------------- controls (VIS_PLAN.md §5.1) */
 
@@ -250,21 +258,10 @@ select.control-input:disabled {
 
 /* ---------------------------------------------------------------- center column */
 
-.panel-embeddings { flex: 0 0 72%; }
-.panel-images { flex: 1 1 auto; }
-
-.embeddings-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow: hidden;
-}
-.plot {                 /* the square plot is sized by JS to min(width, height) and centered */
+.embeddings-body { display: flex; flex-direction: column; }
+.plot {                 /* the scatter fills the panel; the data keep the same scale on both axes (scatter.js) */
   position: relative;
-  display: flex;
   flex: 1 1 0;
-  align-items: center;
-  justify-content: center;
   min-height: 0;
   overflow: hidden;
 }
@@ -278,26 +275,24 @@ select.control-input:disabled {
   background-color: var(--panel);
 }
 .plot-message[hidden] { display: none; }
-/* ---------------------------------------------------------------- steppers + Play (VIS_PLAN.md §5.5) */
 
-.steppers {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 6px;
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
-}
-.stepper-row {
+/* ---------------------------------------------------------------- steppers + Play (VIS_PLAN.md §5.5, draft-v2) */
+
+.steppers {             /* inside the plot, bottom-right; OVERLAY_MARGIN in scatter.js */
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  z-index: 2;
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) auto;   /* LEAD_WIDTH in steppers.js */
+  grid-template-columns: repeat(5, auto);   /* ▶ | label | steps | All | speed */
   align-items: center;
-  gap: 6px;
+  gap: 5px 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
-.stepper-row.has-film { align-items: start; }
-.stepper-lead { display: flex; align-items: center; gap: 8px; }
-.stepper-row.has-film .stepper-lead,
-.stepper-row.has-film .stepper-tail { padding-top: calc(var(--thumb) / 2 - 14px); }  /* centered on the thumbnails */
+.stepper-row { display: contents; }
 .stepper-label {
   color: var(--muted);
   font-size: var(--fs-small);
@@ -306,13 +301,12 @@ select.control-input:disabled {
   text-transform: uppercase;
 }
 .stepper-row.active .stepper-label { color: var(--text); }
-.stepper-steps { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; overflow: hidden; }
-.stepper-tail { display: flex; align-items: center; gap: 6px; }
 
-.play-btn,
-.play-spacer { flex: none; width: 28px; height: 28px; }
 .play-btn {
   position: relative;
+  flex: none;
+  width: 26px;
+  height: 26px;
   border: 0;
   border-radius: 50%;
   background: var(--ink);
@@ -321,15 +315,15 @@ select.control-input:disabled {
 .play-btn::before {           /* ▶ */
   content: "";
   position: absolute;
-  top: 8px;
-  left: 11px;
+  top: 7px;
+  left: 10px;
   border-style: solid;
   border-width: 6px 0 6px 9px;
   border-color: transparent transparent transparent #fff;
 }
 .play-btn.playing::before {   /* ❚❚ = two 3 px bars, 2 px apart */
-  top: 9px;
-  left: 10px;
+  top: 8px;
+  left: 9px;
   width: 2px;
   height: 10px;
   box-sizing: content-box;
@@ -338,44 +332,10 @@ select.control-input:disabled {
 }
 .play-btn:hover { background: #000; }
 
-.seg.compact .step { height: 22px; padding: 0 8px; font-variant-numeric: tabular-nums; }
+.seg.compact .step { height: 22px; padding: 0 7px; font-variant-numeric: tabular-nums; }
 .seg button.current { background: var(--ink); color: #fff; }
 .seg button:disabled { color: var(--faint); background: var(--panel-header); cursor: not-allowed; }
 .all-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
-
-.filmstrip { display: flex; gap: 6px; }  /* GAP in steppers.js */
-.step-thumb {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: var(--fs-small);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-}
-.step-thumb canvas {
-  display: block;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 2px;
-}
-.step-thumb:hover canvas { border-color: var(--border-strong); }
-.step-thumb.current { color: var(--text); font-weight: 600; }
-.step-thumb.current canvas { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
-.step-thumb:disabled { opacity: 0.35; cursor: not-allowed; }
-
-.stepper-axis { display: block; margin-top: 2px; overflow: visible; }
-.stepper-axis line { stroke: var(--border-strong); stroke-width: 1px; }
-.stepper-axis .axis-base { stroke: var(--faint); }
-.stepper-axis circle { fill: var(--faint); }
-.stepper-axis .current line { stroke: var(--ink); }
-.stepper-axis .current circle { fill: var(--ink); }
 
 /* ---------------------------------------------------------------- embeddings toolbar (panel title) */
 
@@ -405,7 +365,7 @@ select.control-input:disabled {
 
 /* ---------------------------------------------------------------- scatterplot (VIS_PLAN.md §5.4, §4.2) */
 
-.scatter { position: relative; flex: none; }
+.scatter { position: absolute; inset: 0; }
 .scatter-svg { display: block; cursor: grab; user-select: none; }
 .scatter-svg:active { cursor: grabbing; }
 .scatter-svg.brush-mode { cursor: crosshair; }
@@ -467,9 +427,9 @@ select.control-input:disabled {
 .badge-value { font-weight: 600; }
 .badge-delta { min-height: 1.15em; color: var(--muted); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
 
-.legend {                       /* draggable, collapsible legend + class filter */
+.legend {                       /* draggable, collapsible legend + class filter; bottom-left (draft-v2) */
   position: absolute;
-  top: 8px;
+  bottom: 8px;
   left: 8px;
   min-width: 150px;
   background: rgba(255, 255, 255, 0.94);
@@ -655,19 +615,18 @@ select.control-input:disabled {
 
 /* ---------------------------------------------------------------- architecture (VIS_PLAN.md §5.2) */
 
-.arch-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 86px;
-  gap: 8px;
-  margin-bottom: 4px;
-  color: var(--muted);
-  font-size: var(--fs-small);
-}
-.arch-head-nh { display: flex; align-items: center; gap: 4px; }
-.arch-row { display: flex; flex-direction: column; }
+.arch-head-nh { display: flex; align-items: center; gap: 4px; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+/* No scrolling: the boxes share the panel height; arrows stretch, and when space is short the type line and the
+   arrows shrink (container queries on the list). */
+.arch { display: flex; flex-direction: column; height: 100%; }
+.arch-list { display: flex; flex: 1 1 0; flex-direction: column; min-height: 0; container-type: size; }
+.arch-row { display: flex; flex: 1 1 0; flex-direction: column; justify-content: flex-end; }
+.arch-row:first-child { flex: none; }
 .arch-arrow {
+  flex: 1 1 auto;
   width: 1px;
-  height: 9px;
+  min-height: 3px;
+  max-height: 22px;
   margin-left: 64px;
   background: var(--border-strong);
 }
@@ -713,6 +672,13 @@ select.control-input:disabled {
 .arch-bar-track { flex: 1; height: 8px; background: var(--hover); border-radius: 1px; }
 .arch-bar-fill { height: 100%; background: var(--ink); border-radius: 1px; }
 .arch-bar-value { width: 30px; font-size: var(--fs-base); text-align: right; }
+/* Compact levels (after the base rules so they win the cascade). */
+@container (max-height: 300px) {
+  .arch-type { display: none; }
+}
+@container (max-height: 175px) {
+  .arch-text, .arch-row.current .arch-text { padding-block: 0; line-height: 1.2; }
+}
 
 /* ---------------------------------------------------------------- model metrics (VIS_PLAN.md §5.7) */
 
@@ -748,13 +714,13 @@ select.control-input:disabled {
 .mm-bar.off .mm-bar-fill { opacity: 0.2; }
 .mm-ghost { fill: var(--ink); }
 
-/* ---------------------------------------------------------------- image view (VIS_PLAN.md §5.6) */
+/* ---------------------------------------------------------------- image view (VIS_PLAN.md §5.6, draft-v2) */
 
-.images { display: flex; flex-direction: column; gap: 6px; }
-.img-bar { display: flex; align-items: center; gap: 6px; }
-.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-right: auto; min-height: 22px; }
+#images-tools { min-width: 0; }
+.chips { display: flex; gap: 4px; min-width: 0; overflow: hidden; }
 .chip-filter {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 4px;
   height: 22px;
@@ -777,41 +743,60 @@ select.control-input:disabled {
 }
 .chip-clear:hover { background: var(--hover); color: var(--ink); }
 .img-sort { width: auto; height: 22px; }
-.img-grid { display: flex; flex-wrap: wrap; gap: 4px; }    /* GAP in images.js */
+.pager { align-items: center; }
+.pager button { width: 24px; padding: 0; font-size: 14px; }
+.pager-text {
+  padding: 0 8px;
+  border-inline: 1px solid var(--border-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
+}
+.img-grid { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; height: 100%; }  /* GAP in images.js */
 .img-thumb {
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: var(--thumb);
+  height: var(--thumb);
   padding: 0;
   border: 0;
   outline: 1px solid var(--border);
   cursor: pointer;
 }
-.img-thumb:hover, .img-thumb.hovered { outline: 2px solid var(--ink); z-index: 1; transform: scale(1.12); }
+.img-thumb:hover, .img-thumb.hovered { outline: 2px solid var(--ink); z-index: 1; }
 .img-thumb.pinned { outline: 2px solid var(--ink); }
-.img-truth { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; }
+.img-thumb.wrong { box-shadow: 0 0 0 3px #f6d4d4; }   /* draft-v2: tinted frame for the misclassified */
+.img-tag {                    /* draft-v2: true label in the bottom-right corner */
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 4px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 2px;
+  color: var(--text);
+  font-size: 9px;
+  line-height: 1.2;
+}
+.img-tag .chip { width: 7px; height: 7px; }
 .img-badge {
   position: absolute;
   top: 0;
   right: 0;
-  min-width: 16px;
-  padding: 1px 2px 1px 6px;
+  padding: 1px 4px;
   background: var(--badge);
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 30% 100%);
   color: #fff;
   font-size: 9px;
   font-weight: 600;
-  line-height: 1.2;
-  text-align: right;
+  line-height: 1.3;
 }
-.img-more { align-self: flex-start; }
 
 /* ---------------------------------------------------------------- data point (VIS_PLAN.md §5.8) */
 
 .dp-hint { margin: 4px 0; color: var(--muted); }
 .dp-body.preview { opacity: 0.55; }
 .dp-header { display: flex; gap: 10px; margin-bottom: 8px; }
-.dp-thumb { width: 96px; height: 96px; border: 1px solid var(--border); }
+.dp-thumb { width: 72px; height: 72px; border: 1px solid var(--border); }
 .dp-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .dp-id { color: var(--muted); font-size: var(--fs-small); }
 .dp-row { display: flex; align-items: center; gap: 6px; }
@@ -826,4 +811,17 @@ select.control-input:disabled {
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
+}
+
+/* Short viewports (e.g. 1280×720 projectors): compact brand and controls so the architecture and the curve fit. */
+@media (max-height: 820px) {
+  .brand { padding-block: 2px 0; }
+  .brand h1 { font-size: 20px; }
+  .brand-logo { width: 34px; height: 34px; }
+  .controls { gap: 4px 8px; }
+  .control-input, .spinner { height: 22px; }
+  .control-note { display: none; }
+  .controls-sep { margin: 0; }
+  #architecture-panel { flex: 6 1 0; }
+  #curve-panel { flex: 5 1 0; }
 }

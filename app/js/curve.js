@@ -49,10 +49,12 @@ export function initCurve(container, { store, tools }) {
   }
 
   function resize() {
-    const box = container.getBoundingClientRect();
-    width = Math.max(0, box.width - MARGIN.left - MARGIN.right);
-    height = Math.max(0, box.height - MARGIN.top - MARGIN.bottom);
-    svg.attr("width", box.width).attr("height", box.height);
+    const style = getComputedStyle(container);   // content box: the SVG must not overflow the padding
+    const boxWidth = container.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const boxHeight = container.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    width = Math.max(0, boxWidth - MARGIN.left - MARGIN.right);
+    height = Math.max(0, boxHeight - MARGIN.top - MARGIN.bottom);
+    svg.attr("width", Math.max(0, boxWidth)).attr("height", Math.max(0, boxHeight));
     plot.attr("transform", `translate(${MARGIN.left},${MARGIN.top})`);
     if (isReady(store.state)) draw(store.state);
   }

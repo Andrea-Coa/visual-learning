@@ -10,15 +10,16 @@ const INPUT_STATIC = "Raw pixels do not change during training";
 const NH_INFO = "Separation: neighborhood hit (NH) of each layer's T2 projection at the current epoch, "
   + "on the shown points. Longer bar = classes better separated.";
 
-/** Builds the panel inside `container`; `subtitle` shows the model name. Returns { setConfiguration(view) }. */
-export function initArchitecture(container, { store, subtitle }) {
+/**
+ * Builds the panel inside `container`; `subtitle` shows the model name and `tools` (panel title) the NH column key.
+ * Returns { setConfiguration(view) }.
+ */
+export function initArchitecture(container, { store, subtitle, tools }) {
   let view = null;
   let built = null;
-  const root = d3.select(container).append("div").attr("class", "arch");
-  const head = root.append("div").attr("class", "arch-head");
-  head.append("span").text("layer");
-  const nhHead = head.append("span").attr("class", "arch-head-nh").text("NH ");
+  const nhHead = d3.select(tools).append("span").attr("class", "arch-head-nh").text("NH");
   nhHead.node().append(infoIcon(NH_INFO));
+  const root = d3.select(container).append("div").attr("class", "arch");
   const list = root.append("div").attr("class", "arch-list");
 
   const isReady = (state) => view && view.dataset === state.dataset && view.model === state.model
