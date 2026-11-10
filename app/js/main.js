@@ -1,6 +1,7 @@
 // Entry point: creates the shared data store and UI state, loads the configuration selected in the state and
 // keeps it in sync. The panels (Phase 7) subscribe to the same store; until they exist, this module renders the
 // generated title and the loading / error states (VIS_PLAN.md §5.4, §9).
+import { initControls } from "./controls.js";
 import { DataStore } from "./data.js";
 import { Store } from "./state.js";
 
@@ -67,6 +68,7 @@ async function loadConfiguration(state) {
 
 async function main() {
   current.index = await data.index();
+  initControls(document.getElementById("controls"), { store, index: current.index });
   store.subscribe(loadConfiguration, ["dataset", "model", "projection"]);
   store.subscribe(renderTitle, ["mode", "layer", "epoch"]);
   await loadConfiguration(store.state);

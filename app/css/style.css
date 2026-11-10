@@ -158,6 +158,94 @@ details.panel:not([open]) > summary::after { transform: rotate(-45deg); }
 details.panel:not([open]) { flex: none; }
 details.panel:not([open]) > summary { border-bottom: none; border-radius: var(--radius); }
 
+/* ---------------------------------------------------------------- controls (VIS_PLAN.md §5.1) */
+
+.controls {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr) 14px;   /* label | control | ⓘ */
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+}
+.controls label { color: var(--muted); }
+.control-cell { min-width: 0; }
+.control-info { display: flex; }
+.control-note {
+  grid-column: 2 / 3;
+  margin-top: -3px;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+.controls-sep {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 2px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.control-input,
+.spinner {
+  width: 100%;
+  height: 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background-color: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+select.control-input {
+  appearance: none;
+  padding: 0 22px 0 7px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'%3E%3Cpath d='M.5.5 4 4 7.5.5' fill='none' stroke='%236f747a' stroke-width='1.2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  background-size: 8px 5px;
+  cursor: pointer;
+}
+select.control-input:hover:not(:disabled),
+.spinner:hover { border-color: var(--ink); }
+select.control-input:disabled {
+  background-color: var(--panel-header);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.spinner { display: flex; overflow: hidden; }
+.spinner button {
+  flex: none;
+  width: 26px;
+  border: 0;
+  background: var(--panel-header);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.spinner button:hover:not(:disabled) { background: var(--hover); }
+.spinner button:disabled { color: var(--faint); cursor: default; }
+.spinner input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  border-inline: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.spinner input::-webkit-inner-spin-button,
+.spinner input::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+
+:is(select, button, input, .info):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
 /* ---------------------------------------------------------------- center column */
 
 .panel-embeddings { flex: 0 0 72%; }
@@ -207,6 +295,7 @@ details.panel:not([open]) > summary { border-bottom: none; border-radius: var(--
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  line-height: 1.4;
   pointer-events: none;
 }
 
