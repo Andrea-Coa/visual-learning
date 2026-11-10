@@ -19,6 +19,7 @@ pipeline/                 Python pipeline (runs on Colab or locally)
   models.py               MLP and CNN from the paper, exposing hidden activations
   metrics.py              confusion matrix, precision / recall / F1
   train.py                training + activation snapshots + metrics (entry point)
+  project.py              t-SNE / PCA projections for T1 and T2 + neighborhood hit (entry point)
 notebooks/colab_train.ipynb   runs pipeline/train.py on a Colab T4
 app/                      Flask + D3 app (later phases)
 raw/                      training outputs (git-ignored, large)
@@ -172,3 +173,23 @@ s = np.load("raw/mnist/mlp/snapshots/epoch_050.npz")
 s["layers"]            # ['h1' 'h2' 'h3' 'h4']
 s["h4"].shape          # (1000, 1000)
 ```
+
+## Step by step: projections (local)
+
+After `raw/` contains the training outputs:
+
+```bash
+python -m pipeline.project                    # t-SNE and PCA for all configurations
+python -m pipeline.project --method pca       # only PCA (seconds); --dataset / --model select configurations
+```
+
+Results go to `raw/<dataset>/<model>/proj_<method>.npz`. Existing files are skipped unless you pass `--force`.
+On an 8-core laptop, PCA takes ~10 s per configuration and t-SNE ~15 min (~1.5 h for all six).
+
+- **T1 (epochs):** for every layer (hidden layers + output), t-SNE of all snapshot epochs together, so the
+  points of different epochs share one map. PCA: one PCA per epoch, each aligned (Procrustes) to the previous one.
+- **T2 (layers):** for every snapshot epoch, Input → hidden layers → Output. Every t-SNE starts from the t-SNE of
+  the Input layer, which keeps clusters in roughly the same place across layers and epochs. PCA: each layer aligned
+  to the previous one.
+- PCA uses `log1p` of the activations (ReLU outputs are heavy-tailed); t-SNE uses PCA-50 of the raw activations.
+- The neighborhood hit (k = 6, share of each point's 6 nearest neighbors in the same class) is stored for every frame.

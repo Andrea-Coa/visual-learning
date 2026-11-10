@@ -23,3 +23,9 @@
   (`.venv/Scripts/python.exe`, `import pymupdf`) to extract text or render pages to PNG.
 
 - Use the `.venv/` to install python libraries.
+
+## Data Visualization
+
+- Avoid textual explanations on plots. If a plot must be explained, opt for an info icon rather than presenting the explanation on the plot. 
+
+- Use visualizations in `style-references/` for aesthetic/style references. 
