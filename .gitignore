@@ -6,3 +6,6 @@ __pycache__/
 # Downloaded datasets and raw training outputs (large)
 /data/
 /raw/
+
+# Submission ZIP (python package.py)
+/dist/
