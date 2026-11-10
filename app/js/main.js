@@ -1,7 +1,12 @@
 // Entry point: creates the shared data store and UI state, builds the panels, loads the configuration selected in
 // the state and hands it to the panels. Loading / error states are an overlay on the plot (VIS_PLAN.md §9).
+import { initArchitecture } from "./architecture.js";
 import { initControls } from "./controls.js";
+import { initCurve } from "./curve.js";
 import { DataStore } from "./data.js";
+import { initDataPoint } from "./datapoint.js";
+import { initImages } from "./images.js";
+import { initModelMetrics } from "./model-metrics.js";
 import { initScatter } from "./scatter.js";
 import { Store } from "./state.js";
 import { initSteppers } from "./steppers.js";
@@ -77,8 +82,15 @@ async function main() {
   current.index = await data.index();
   initControls(document.getElementById("controls"), { store, index: current.index });
   panels.push(
-    initScatter(plot, { store, tools: document.getElementById("embeddings-tools") }),
+    initScatter(plot, { store, data, tools: document.getElementById("embeddings-tools") }),
     initSteppers(document.getElementById("steppers"), { store }),
+    initArchitecture(document.getElementById("architecture"), {
+      store, subtitle: document.getElementById("architecture-model"),
+    }),
+    initCurve(document.getElementById("learning-curve"), { store, tools: document.getElementById("curve-tools") }),
+    initModelMetrics(document.getElementById("metrics"), { store }),
+    initImages(document.getElementById("images"), { store, subtitle: document.getElementById("images-source") }),
+    initDataPoint(document.getElementById("datapoint"), { store }),
   );
   store.subscribe(loadConfiguration, ["dataset", "model", "projection"]);
   store.subscribe(renderTitle, ["mode", "layer", "epoch"]);

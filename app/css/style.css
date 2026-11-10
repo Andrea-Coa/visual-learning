@@ -100,7 +100,9 @@ html, body {
   border-radius: var(--radius);
 }
 .panel-grow { flex: 1 1 auto; }
-#curve-panel { flex: 0 0 210px; }
+#controls-panel { flex: none; }
+#curve-panel { flex: 0 1 250px; min-height: 160px; }
+#architecture-panel { min-height: 120px; }
 
 .panel-title {
   display: flex;
@@ -421,6 +423,25 @@ select.control-input:disabled {
   stroke-width: 3px;
   pointer-events: none;
 }
+.pt path.hollow { stroke: var(--ink); stroke-width: 1.2px; }
+.points.inert { pointer-events: none; }
+
+/* path view (VIS_PLAN.md §4.3) */
+.trails path { fill: none; stroke-width: 1px; vector-effect: non-scaling-stroke; pointer-events: none; }
+.trail-end { pointer-events: none; }
+.traj-line { fill: none; stroke-width: 2.5px; vector-effect: non-scaling-stroke; pointer-events: none; }
+.traj-step { pointer-events: none; }
+.traj-step circle { fill: var(--panel); stroke-width: 1.5px; }
+.traj-step.current circle { fill: var(--ink); stroke: var(--ink); }
+.traj-step text {
+  fill: var(--ink);
+  font-size: 10px;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+}
+.comet-dot { pointer-events: none; }
+
 .brush-rect {
   fill: rgba(34, 34, 34, 0.06);
   stroke: var(--ink);
@@ -507,6 +528,10 @@ select.control-input:disabled {
 .legend-item:hover { background: var(--hover); }
 .legend-item.off { color: var(--faint); }
 .legend-item.off .chip { opacity: 0.25; }
+.legend-item:disabled { cursor: default; }
+.legend-item:disabled:hover { background: none; }
+.legend-item .swatch { flex: none; overflow: visible; }
+.legend-item.off .swatch { opacity: 0.25; }
 .legend-count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 .legend-key {
   display: flex;
@@ -600,6 +625,204 @@ select.control-input:disabled {
   font-size: var(--fs-metric);
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------------------------------------------------------------- shared chart parts */
+
+.axis text { fill: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.axis path, .axis line { stroke: var(--border-strong); }
+.curve-overlay { fill: transparent; cursor: crosshair; }
+.marker-rule { stroke: var(--ink); stroke-width: 1px; }
+.mm-bar-labels text { fill: var(--muted); font-size: 10px; }
+.mm-bar-labels text.off { fill: var(--faint); }
+.mm-bar-labels text.strong { fill: var(--ink); font-weight: 600; }
+
+/* ---------------------------------------------------------------- learning curve (VIS_PLAN.md §5.3) */
+
+#learning-curve { padding: 4px 4px 2px; overflow: hidden; }
+.curve-svg { display: block; }
+.curve-line { fill: none; stroke-width: 1.5px; }
+.snapshot-ticks line { stroke: var(--ink); stroke-width: 1px; }
+.end-labels text { font-size: 10px; }
+.curve-marker circle { stroke: var(--panel); stroke-width: 1px; }
+.curve-marker text {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 3px;
+}
+.curve-hover line { stroke: var(--faint); stroke-dasharray: 2 2; }
+
+/* ---------------------------------------------------------------- architecture (VIS_PLAN.md §5.2) */
+
+.arch-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 86px;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+.arch-head-nh { display: flex; align-items: center; gap: 4px; }
+.arch-row { display: flex; flex-direction: column; }
+.arch-arrow {
+  width: 1px;
+  height: 9px;
+  margin-left: 64px;
+  background: var(--border-strong);
+}
+.arch-line { display: grid; grid-template-columns: minmax(0, 1fr) 86px; gap: 8px; align-items: center; }
+.arch-box {
+  display: flex;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.arch-box:hover { border-color: var(--ink); }
+.arch-stripe { flex: none; width: 0; }
+.arch-row.ramp .arch-stripe { width: 6px; }
+.arch-text {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 8px;
+  padding: 4px 8px;
+  min-width: 0;
+}
+.arch-name { font-weight: 600; }
+.arch-units { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.arch-type {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arch-row.current .arch-box { border: 2px solid var(--ink); background: #eeeeee; }
+.arch-row.current .arch-text { padding: 3px 7px; }
+.arch-row.static .arch-box { color: var(--faint); border-style: dashed; }
+.arch-row.static .arch-name { font-weight: 400; }
+.arch-bar { display: flex; align-items: center; gap: 6px; }
+.arch-bar-track { flex: 1; height: 8px; background: var(--hover); border-radius: 1px; }
+.arch-bar-fill { height: 100%; background: var(--ink); border-radius: 1px; }
+.arch-bar-value { width: 30px; font-size: var(--fs-base); text-align: right; }
+
+/* ---------------------------------------------------------------- model metrics (VIS_PLAN.md §5.7) */
+
+.mm-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 6px;
+}
+.mm-head + svg + .mm-head { margin-top: 12px; }
+.mm-title { font-weight: 600; }
+.mm-sub { color: var(--muted); }
+.mm-note { display: inline-flex; }
+.mm-check { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: var(--muted); cursor: pointer; }
+.mm-check input { margin: 0; }
+.mm-select { width: auto; height: 22px; margin-left: auto; }
+.mm-key { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: var(--fs-small); }
+.ghost-swatch { display: inline-block; width: 12px; height: 2px; background: var(--ink); }
+.mm-matrix, .mm-bars { display: block; }
+.mm-corner { fill: var(--faint); font-size: 9px; }
+.mm-h text { fill: var(--text); font-size: 10px; }
+.mm-h.off { opacity: 0.3; }
+.mm-cell { cursor: pointer; }
+.mm-cell text { font-size: 9px; font-variant-numeric: tabular-nums; pointer-events: none; }
+.mm-cell:hover rect { stroke: var(--ink); stroke-width: 1px; }
+.mm-cell.selected rect { stroke: var(--ink); stroke-width: 2px; }
+.mm-cell.dim { opacity: 0.35; }
+.mm-focus { fill: none; stroke: var(--ink); stroke-width: 2px; stroke-dasharray: 3 2; pointer-events: none; }
+.mm-bar { cursor: pointer; }
+.mm-hit { fill: transparent; }
+.mm-bar:hover .mm-hit { fill: var(--hover); }
+.mm-bar.off .mm-bar-fill { opacity: 0.2; }
+.mm-ghost { fill: var(--ink); }
+
+/* ---------------------------------------------------------------- image view (VIS_PLAN.md §5.6) */
+
+.images { display: flex; flex-direction: column; gap: 6px; }
+.img-bar { display: flex; align-items: center; gap: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-right: auto; min-height: 22px; }
+.chip-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 2px 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--panel-header);
+  font-size: var(--fs-small);
+}
+.chip-clear {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+.chip-clear:hover { background: var(--hover); color: var(--ink); }
+.img-sort { width: auto; height: 22px; }
+.img-grid { display: flex; flex-wrap: wrap; gap: 4px; }    /* GAP in images.js */
+.img-thumb {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  outline: 1px solid var(--border);
+  cursor: pointer;
+}
+.img-thumb:hover, .img-thumb.hovered { outline: 2px solid var(--ink); z-index: 1; transform: scale(1.12); }
+.img-thumb.pinned { outline: 2px solid var(--ink); }
+.img-truth { position: absolute; right: 0; bottom: 0; left: 0; height: 3px; }
+.img-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 16px;
+  padding: 1px 2px 1px 6px;
+  background: var(--badge);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 30% 100%);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: right;
+}
+.img-more { align-self: flex-start; }
+
+/* ---------------------------------------------------------------- data point (VIS_PLAN.md §5.8) */
+
+.dp-hint { margin: 4px 0; color: var(--muted); }
+.dp-body.preview { opacity: 0.55; }
+.dp-header { display: flex; gap: 10px; margin-bottom: 8px; }
+.dp-thumb { width: 96px; height: 96px; border: 1px solid var(--border); }
+.dp-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dp-id { color: var(--muted); font-size: var(--fs-small); }
+.dp-row { display: flex; align-items: center; gap: 6px; }
+.dp-actions { display: flex; align-items: center; gap: 8px; margin-top: auto; }
+.dp-actions .mm-check { margin-left: 0; }
+.dp-title { margin: 6px 0 2px; color: var(--muted); font-size: var(--fs-small); font-weight: 600; }
+.dp-softmax, .dp-learned { display: block; }
+.dp-softmax rect.true-class { stroke: var(--ink); stroke-width: 1.5px; }
+.dp-half { stroke: var(--faint); stroke-dasharray: 3 3; }
+.dp-line { fill: none; stroke-width: 1.5px; }
+.dp-note { fill: var(--text); font-size: 11px; font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }

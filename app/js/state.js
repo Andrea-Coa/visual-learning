@@ -19,11 +19,15 @@ export const DEFAULTS = Object.freeze({
   brushed: null,           // Set of observation ids, or null
   hovered: null,           // observation id, or null
   pinned: null,            // observation id, or null
+  cellHover: null,         // { truth, pred } confusion-matrix cell under the mouse, or null (temporary highlight)
+  trajectory: true,        // draw the pinned point's unbundled trajectory (Data point panel toggle)
+  metric: "recall",        // per-class bars: recall | precision | f1
+  curve: "acc",            // learning curve: acc | loss
 });
 
 // Selections hold observation ids, so they survive epoch/layer changes and Play, but not a change of what the
 // ids are compared across (VIS_PLAN.md §3, rules).
-const SELECTION_RESET = { brushed: null, cellFilter: null, pinned: null, hovered: null };
+const SELECTION_RESET = { brushed: null, cellFilter: null, cellHover: null, pinned: null, hovered: null };
 const RESETS = {
   dataset: { ...SELECTION_RESET, classFilter: null, layer: null }, // other classes, other layers
   model: { ...SELECTION_RESET, layer: null },                      // other layers

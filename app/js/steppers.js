@@ -3,10 +3,9 @@
 // parameter. The player advances the active dimension one step at a time and pauses on any manual step change.
 import { frameOf } from "./data.js";
 import { cachedNeighborhoodHit } from "./metrics.js";
-import { CLASS_COLORS, MOVE_MS, ms } from "./scatter.js";
+import { CLASS_COLORS, DWELL_MS, MOVE_MS, ms } from "./encoding.js";
 import { tooltip } from "./ui.js";
 
-const DWELL_MS = 450;               // pause on each frame during Play, at 1×
 const SPEEDS = [0.5, 1, 2];
 const THUMB_SIZES = [64, 48];       // filmstrip thumbnails; plain buttons if even the smallest doesn't fit
 const GAP = 6;                      // px between steps (keep in sync with .filmstrip gap)

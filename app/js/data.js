@@ -133,6 +133,22 @@ export class Config {
     return this.preds[this.epochIndex(epoch)][id];
   }
 
+  /**
+   * Per observation: the snapshot index from which it stays correctly classified until the last snapshot, or -1 if
+   * it is wrong at the last snapshot ("never learned"; VIS_PLAN.md §4.1).
+   */
+  get learnedAt() {
+    if (!this._learnedAt) {
+      const last = this.epochs.length - 1;
+      this._learnedAt = Int8Array.from({ length: this.n }, (_, id) => {
+        let e = last;
+        while (e >= 0 && this.preds[e][id] === this.labels[id]) e--;
+        return e === last ? -1 : e + 1;
+      });
+    }
+    return this._learnedAt;
+  }
+
   /** Softmax probabilities of observation `id` at `epoch`, as numbers in [0, 1]. */
   probsOf(epoch, id) {
     const p = this.probs[this.epochIndex(epoch)];

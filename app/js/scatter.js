@@ -1,26 +1,25 @@
-// Embeddings view, scatter mode (VIS_PLAN.md §5.4; encodings §4.1–4.2; animations §6).
+// Embeddings view (VIS_PLAN.md §5.4; encodings §4; animations §6): scatter mode and path view.
 // Every observation is an SVG group keyed by its id, so selections survive epoch/layer changes and the points can
 // move between frames. Positions live in "base" pixels; zoom/pan transforms the whole layer and scales every glyph
-// back by 1/k, so the point size stays constant while zooming.
+// back by 1/k, so marks keep a constant size while zooming. The path view (`All`) draws the trails of paths.js on top.
 import { frameOf } from "./data.js";
+import { CLASS_COLORS, INK, CORRECT_GRAY, MOVE_MS, learnedColor, ms, pointStyle } from "./encoding.js";
 import { cachedNeighborhoodHit, sampleAccuracy } from "./metrics.js";
+import { PathLayer, straightTrail } from "./paths.js";
 import { infoIcon, tooltip } from "./ui.js";
-
-export const CLASS_COLORS = d3.schemeCategory10;  // = matplotlib tab10, the colors of the paper's figures
 
 const BASE_OPACITY = 0.75;
 const DIM_OPACITY = 0.08;
+const PATH_POINT_OPACITY = 0.15;  // points behind the trails in the path view (§6)
 const EMPHASIS = 1.8;      // radius factor of the hovered / pinned point
 const PAD = 16;            // px between the frame and the outermost points
 const MAX_ZOOM = 8;
 const HOVER_DELAY = 80;    // ms before the tooltip appears
+const TRAIL_HIT_PX = 8;    // hover distance to a trail in the path view
 const NH_K = 6;
 const LEGEND_MARGIN = 8;   // px between the legend and the plot frame
-const DURATION = { move: 750, swapOut: 200, swapIn: 200, sample: 300, fade: 250, reset: 400 };
-
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-export const ms = (duration) => (reducedMotion.matches ? 0 : duration);
-export const MOVE_MS = DURATION.move;
+const COMET = [0.5, 0.32, 0.16];  // opacity of the pinned point's last positions during Play (§6)
+const DURATION = { swapOut: 200, swapIn: 200, sample: 300, fade: 250, reset: 400 };
 
 const NH_INFO = "NH (neighborhood hit): share of each point's 6 nearest neighbors in this projection that have "
   + "its class. Sample acc: accuracy of the shown points at this epoch. ▲ ▼: change from the previous step.";
@@ -38,20 +37,20 @@ function framesFor(config, coords, state) {
 }
 
 /** Whether observation `d` passes the active filters (they combine with AND; VIS_PLAN.md §3). */
-function passes(d, state, { ignoreClass = false } = {}) {
+export function passes(d, state, { ignoreClass = false } = {}) {
   if (!ignoreClass && state.classFilter && !state.classFilter.has(d.label)) return false;
   if (state.cellFilter && (d.label !== state.cellFilter.truth || d.pred !== state.cellFilter.pred)) return false;
   if (state.brushed && !state.brushed.has(d.id)) return false;
   return true;
 }
 
-const filtersActive = (state) => Boolean(state.classFilter || state.cellFilter || state.brushed);
+export const filtersActive = (state) => Boolean(state.classFilter || state.cellFilter || state.brushed);
 
 /**
- * Builds the scatterplot inside `container` (#plot) and its toolbar inside `tools`.
+ * Builds the embeddings view inside `container` (#plot) and its toolbar inside `tools`; `data` loads the trails.
  * Returns { setConfiguration(view) }, called by main.js once a configuration's files are loaded.
  */
-export function initScatter(container, { store, tools }) {
+export function initScatter(container, { store, data, tools }) {
   let view = null;              // { index, config, coords, dataset, model, projection, spriteUrl }
   let shown = null;             // what is drawn: { key, layer, epoch, n }
   let size = 0;
@@ -63,7 +62,11 @@ export function initScatter(container, { store, tools }) {
   let hoverTimer = null;
   let lastPointer = null;
   let ids = [];                 // observation ids currently drawn (the sample)
-  const nodes = new Map();      // id -> datum { id, label, x, y, pred, drawnPred }, reused across steps
+  let comet = [];               // last positions of the pinned point during Play
+  let pathToken = 0;
+  let drawnPaths = null;        // { geometry, strength } of the trails on screen
+  const nodes = new Map();      // id -> datum { id, label, learnedAt, x, y, pred, drawnPred }
+  const geometries = new Map(); // geometry key -> { key, labels, frames, nodePaths, trails: Map strength -> Map }
   const x = d3.scaleLinear().domain([0, 1]);
   const y = d3.scaleLinear().domain([0, 1]);
 
@@ -74,6 +77,10 @@ export function initScatter(container, { store, tools }) {
   const frameRect = svg.append("rect").attr("class", "scatter-frame");
   const zoomLayer = svg.append("g").attr("class", "zoom-layer");
   const pointsG = zoomLayer.append("g").attr("class", "points");
+  const glyphScale = () => `scale(${1 / transform.k})`;
+  const paths = new PathLayer(zoomLayer, glyphScale);
+  const cometG = zoomLayer.append("g").attr("class", "comet");
+  const trajectoryG = zoomLayer.append("g").attr("class", "trajectory");
   const brushRect = svg.append("rect").attr("class", "brush-rect").style("display", "none");
 
   const badges = root.append("div").attr("class", "badges");
@@ -90,7 +97,7 @@ export function initScatter(container, { store, tools }) {
 
   const legend = root.append("div").attr("class", "legend");
   const legendHeader = legend.append("div").attr("class", "legend-header");
-  legendHeader.append("span").text("Legend");
+  legendHeader.append("span").attr("class", "legend-title").text("Legend");
   legendHeader.append("button").attr("type", "button").attr("class", "legend-toggle")
     .attr("aria-label", "Collapse legend")
     .on("click", () => {
@@ -100,9 +107,6 @@ export function initScatter(container, { store, tools }) {
     });
   const legendItems = legend.append("div").attr("class", "legend-items");
   const legendKey = legend.append("div").attr("class", "legend-key");
-  legendKey.append("svg").attr("width", 12).attr("height", 12).attr("viewBox", "-6 -6 12 12")
-    .append("path").attr("d", d3.symbol(d3.symbolTriangle, 40)());
-  legendKey.append("span").text("misclassified (predicted class color)");
 
   const empty = root.append("div").attr("class", "scatter-empty").attr("hidden", true);
   empty.append("span").text("No observations match");
@@ -148,13 +152,15 @@ export function initScatter(container, { store, tools }) {
   /** Shape and color of a point from what is currently drawn (`drawnPred` switches at mid-transition). */
   function paintGlyph(path, d, state) {
     const emphasized = isEmphasized(d, state);
-    path.attr("d", symbolPath(d.drawnPred !== d.label, emphasized ? EMPHASIS : 1))
-      .attr("fill", CLASS_COLORS[d.drawnPred])
+    const style = pointStyle(state.colorBy, { label: d.label, pred: d.drawnPred, learnedAt: d.learnedAt },
+      view.config.epochs.length);
+    path.attr("d", symbolPath(style.wrong, emphasized ? EMPHASIS : 1))
+      .attr("fill", style.fill)
+      .classed("hollow", style.hollow)
       .classed("emph", emphasized);
   }
 
   const position = (d) => `translate(${d.x},${d.y})`;
-  const glyphScale = () => `scale(${1 / transform.k})`;
 
   // ------------------------------------------------------------------ zoom, pan, brush
   const zoom = d3.zoom()
@@ -164,7 +170,7 @@ export function initScatter(container, { store, tools }) {
     .on("zoom", (event) => {
       transform = event.transform;
       zoomLayer.attr("transform", transform);
-      pointsG.selectAll(".glyph").attr("transform", glyphScale());
+      zoomLayer.selectAll(".glyph").attr("transform", glyphScale());
       tooltip.hide();
     });
   svg.call(zoom).on("dblclick.zoom", null);
@@ -194,22 +200,33 @@ export function initScatter(container, { store, tools }) {
       const [a0, b0] = transform.invert([x0, y0]);
       const [a1, b1] = transform.invert([x1, y1]);
       const inside = ids.filter((id) => {
-        const d = nodes.get(id);
-        return d.x >= a0 && d.x <= a1 && d.y >= b0 && d.y <= b1;
+        // In the path view the visible marks are the trail ends, so those are brushed.
+        const [px, py] = paths.active ? paths.end(id) : [nodes.get(id).x, nodes.get(id).y];
+        return px >= a0 && px <= a1 && py >= b0 && py <= b1;
       });
       store.set({ brushed: inside.length ? new Set(inside) : null }); // an empty brush clears itself (§9)
     }));
 
   svg.on("click", (event) => {
     const point = event.target.closest(".pt");
-    if (point) {
-      const { id } = d3.select(point).datum();
-      store.set({ pinned: store.get("pinned") === id ? null : id });
-    } else if (store.get("brushed")) {
-      store.set({ brushed: null });
-    }
+    const id = point ? d3.select(point).datum().id : paths.active ? store.get("hovered") : null;
+    if (id !== null) store.set({ pinned: store.get("pinned") === id ? null : id });
+    else if (store.get("brushed")) store.set({ brushed: null });
   });
-  svg.on("mousemove.pointer", (event) => { lastPointer = event; });
+
+  // Hover in the path view: the trail closest to the cursor (points are not interactive there).
+  svg.on("mousemove.pointer", (event) => {
+    lastPointer = event;
+    if (!paths.active) return;
+    const [px, py] = transform.invert(d3.pointer(event, svg.node()));
+    const id = paths.nearest(px, py, TRAIL_HIT_PX / transform.k);
+    if (id !== store.get("hovered")) {
+      if (id === null) leaveHover();
+      else enterHover(id);
+    }
+    tooltip.move(event);
+  });
+  svg.on("mouseleave.pointer", () => { if (paths.active) leaveHover(); });
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || event.target.closest?.("input, select, textarea")) return;
@@ -218,11 +235,20 @@ export function initScatter(container, { store, tools }) {
   });
 
   // ------------------------------------------------------------------ hover + tooltip
+  function enterHover(id) {
+    store.set({ hovered: id });
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => tooltip.show(tooltipContent(id), lastPointer), HOVER_DELAY);
+  }
+  function leaveHover() {
+    clearTimeout(hoverTimer);
+    tooltip.hide();
+    if (store.get("hovered") !== null) store.set({ hovered: null });
+  }
+
   function onEnter(event, d) {
     lastPointer = event;
-    store.set({ hovered: d.id });
-    clearTimeout(hoverTimer);
-    hoverTimer = setTimeout(() => tooltip.show(tooltipContent(d), lastPointer), HOVER_DELAY);
+    enterHover(d.id);
   }
   function onMove(event) {
     lastPointer = event;
@@ -234,28 +260,31 @@ export function initScatter(container, { store, tools }) {
     if (store.get("hovered") === d.id) store.set({ hovered: null });
   }
 
-  function tooltipContent(d) {
+  function tooltipContent(id) {
     const { index, config, dataset, spriteUrl } = view;
     const state = store.state;
-    const pred = config.pred(state.epoch, d.id);
-    const conf = config.probsOf(state.epoch, d.id)[pred];
+    const label = config.labels[id];
+    const pred = config.pred(state.epoch, id);
+    const conf = config.probsOf(state.epoch, id)[pred];
     const box = d3.create("div").attr("class", "tip-point");
     const thumb = box.append("div").attr("class", "thumb tip-thumb");
-    Object.assign(thumb.node().style, index.sprite(dataset, d.id, 64, spriteUrl));
+    Object.assign(thumb.node().style, index.sprite(dataset, id, 64, spriteUrl));
     const text = box.append("div").attr("class", "tip-text");
-    text.append("div").attr("class", "tip-id").text(`#${d.id}`);
-    const row = (label, cls, value) => {
+    text.append("div").attr("class", "tip-id").text(`#${id}`);
+    const row = (name, cls, value) => {
       const line = text.append("div").attr("class", "tip-row");
       line.append("span").attr("class", "chip").style("background", CLASS_COLORS[cls]);
-      line.append("span").text(`${label}: ${config.classes[cls]}${value ?? ""}`);
+      line.append("span").text(`${name}: ${config.classes[cls]}${value ?? ""}`);
     };
-    row("true", d.label);
-    row(pred === d.label ? "predicted" : "▲ predicted", pred, ` (conf ${conf.toFixed(2)})`);
+    row("true", label);
+    row(pred === label ? "predicted" : "▲ predicted", pred, ` (conf ${conf.toFixed(2)})`);
     return box.node();
   }
 
   // ------------------------------------------------------------------ rendering
   const keyOf = (state) => `${state.dataset}/${state.model}/${state.projection}/${state.mode}`;
+  const PATH_KEYS = ["showAll", "bundling", "layer", "epoch", "sampleSize", "classFilter", "cellFilter", "brushed"];
+  const TRAJECTORY_KEYS = ["pinned", "hovered", "trajectory", "showAll", "layer", "epoch"];
 
   function isReady(state) {
     if (!view || state.layer === null || state.epoch === null) return false;
@@ -275,8 +304,13 @@ export function initScatter(container, { store, tools }) {
     if (stepChanged || sampleChanged) {
       draw(state, { move: stepChanged, sample: sampleChanged });
     } else {
-      restyle(state, { fade: ["classFilter", "cellFilter", "brushed"].some((k) => changed.has(k)) });
+      const fadeKeys = ["classFilter", "cellFilter", "brushed", "showAll", "cellHover"];
+      restyle(state, { fade: fadeKeys.some((k) => changed.has(k)) });
     }
+    if (changed.has("colorBy")) renderLegend(state);
+    if (PATH_KEYS.some((k) => changed.has(k))) updatePaths(state);
+    if (TRAJECTORY_KEYS.some((k) => changed.has(k))) renderTrajectory(state);
+    if (changed.has("pinned") || (changed.has("playing") && !state.playing)) clearComet();
   }
 
   /** Dataset / model / projection / mode change: positions are not comparable, so fade out and back in (§6). */
@@ -287,14 +321,20 @@ export function initScatter(container, { store, tools }) {
       .on("end", () => {
         swapping = false;
         pointsG.selectAll(".pt").remove();
+        paths.clear();
+        drawnPaths = null;
         nodes.clear();
+        geometries.clear();
+        clearComet();
         shown = null;
         const state = store.state;
         if (!isReady(state)) return;
         svg.call(zoom.transform, d3.zoomIdentity);
-        renderLegendItems();
+        renderLegend(state);
         if (!legendDragged) placeLegend(); // class names change the legend width (e.g. CIFAR-10)
         draw(state, {});
+        updatePaths(state);
+        renderTrajectory(state);
         zoomLayer.transition("swap").duration(ms(DURATION.swapIn)).style("opacity", 1);
       });
   }
@@ -306,12 +346,15 @@ export function initScatter(container, { store, tools }) {
     const { frame, previous } = framesFor(config, coords, state);
     const preds = config.preds[config.epochIndex(state.epoch)];
     const nextRadius = state.sampleSize <= 300 ? 4 : 3;
-    const radiusChanged = nextRadius !== radius;
+    if (nextRadius !== radius) symbolCache.clear();
     radius = nextRadius;
+
+    const pinned = state.pinned !== null ? nodes.get(state.pinned) : null;
+    if (move && state.playing && pinned) comet = [[pinned.x, pinned.y], ...comet].slice(0, COMET.length);
 
     for (const id of ids) {
       let d = nodes.get(id);
-      if (!d) nodes.set(id, (d = { id, label: config.labels[id] }));
+      if (!d) nodes.set(id, (d = { id, label: config.labels[id], learnedAt: config.learnedAt[id] }));
       d.x = x(frame[2 * id]);
       d.y = y(frame[2 * id + 1]);
       d.pred = preds[id];
@@ -337,7 +380,7 @@ export function initScatter(container, { store, tools }) {
         },
       );
 
-    const moveMs = ms(DURATION.move) / (state.playing ? state.speed : 1); // Play speed scales the motion (§6)
+    const moveMs = ms(MOVE_MS) / (state.playing ? state.speed : 1); // Play speed scales the motion (§6)
     if (move) {
       points.transition("move").duration(moveMs).ease(d3.easeCubicInOut).attr("transform", position);
       // Glyph changes (circle <-> triangle, predicted color) happen at mid-transition (§6).
@@ -348,34 +391,37 @@ export function initScatter(container, { store, tools }) {
     } else {
       points.interrupt("move").interrupt("glyph").attr("transform", position).each((d) => { d.drawnPred = d.pred; });
     }
-    if (radiusChanged) symbolCache.clear();
 
     shown = { key: keyOf(state), layer: state.layer, epoch: state.epoch, n: state.sampleSize };
     renderBadges(state, frame, previous, move ? moveMs : 0);
     restyle(state, { fade: true });
+    renderComet(moveMs);
   }
 
-  /** Opacity (filters), emphasis (hover / pin), pin ring + label, legend counts, empty-state message. */
+  /** Opacity (filters, highlights, path view), emphasis (hover / pin), pin ring + label, legend, empty state. */
   function restyle(state, { fade = false } = {}) {
     const points = pointsG.selectAll(".pt:not(.exiting)");
     const anyFilter = filtersActive(state);
+    const cell = state.cellHover;
+    const highlight = legendHover !== null ? (d) => d.label === legendHover
+      : cell ? (d) => d.label === cell.truth && d.pred === cell.pred : null;
     const opacity = (d) => {
-      if (legendHover !== null) return d.label === legendHover ? 1 : DIM_OPACITY;
-      if (!anyFilter) return BASE_OPACITY;
-      return passes(d, state) ? 1 : DIM_OPACITY;
+      let value;
+      if (highlight) value = highlight(d) ? 1 : DIM_OPACITY;
+      else if (!anyFilter) value = BASE_OPACITY;
+      else value = passes(d, state) ? 1 : DIM_OPACITY;
+      return state.showAll ? Math.min(value, PATH_POINT_OPACITY) : value;
     };
+    pointsG.classed("inert", state.showAll);
     (fade ? points.transition("fade").duration(ms(DURATION.fade)) : points.interrupt("fade"))
       .style("opacity", opacity);
 
     points.select("path").each(function (d) { paintGlyph(d3.select(this), d, state); });
-    points.select(".glyph").selectAll(".pin-ring")
-      .data((d) => (d.id === state.pinned ? [d] : []))
-      .join("circle")
+    const pinnedHere = (d) => (d.id === state.pinned && !state.showAll ? [d] : []);
+    points.select(".glyph").selectAll(".pin-ring").data(pinnedHere).join("circle")
       .attr("class", "pin-ring")
       .attr("r", radius * EMPHASIS + 3);
-    points.select(".glyph").selectAll(".pin-label")
-      .data((d) => (d.id === state.pinned ? [d] : []))
-      .join("text")
+    points.select(".glyph").selectAll(".pin-label").data(pinnedHere).join("text")
       .attr("class", "pin-label")
       .attr("x", radius * EMPHASIS + 6)
       .attr("dy", "0.35em")
@@ -385,6 +431,152 @@ export function initScatter(container, { store, tools }) {
     const visible = ids.filter((id) => passes(nodes.get(id), state)).length;
     empty.attr("hidden", anyFilter && visible === 0 ? null : true);
     renderLegendCounts(state);
+  }
+
+  // ------------------------------------------------------------------ path view (trails)
+  /** Frames along the active dimension, their labels and the index of the current step. */
+  function stepFrames(state) {
+    const { config, coords } = view;
+    if (state.mode === "epoch") {
+      return {
+        frames: config.epochs.map((epoch) => frameOf(config, coords, { mode: "epoch", layer: state.layer, epoch })),
+        labels: config.epochs.map((e) => `e${e}`),
+        current: config.epochIndex(state.epoch),
+      };
+    }
+    return {
+      frames: config.t2Layers.map((layer) => frameOf(config, coords, { mode: "layer", layer, epoch: state.epoch })),
+      labels: config.layers.map((l) => l.label),
+      current: config.t2Layers.indexOf(state.layer),
+    };
+  }
+
+  const geometryKey = (state) => `${keyOf(state)}|${state.mode === "epoch" ? state.layer : state.epoch}|${size}`;
+
+  /** Unbundled step positions (base px) of every observation along the active dimension (cached). */
+  function geometryFor(state) {
+    const key = geometryKey(state);
+    if (!geometries.has(key)) {
+      const { frames, labels } = stepFrames(state);
+      const nodePaths = new Map();
+      for (let id = 0; id < view.config.n; id++) {
+        const p = new Float32Array(frames.length * 2);
+        frames.forEach((f, s) => { p[2 * s] = x(f[2 * id]); p[2 * s + 1] = y(f[2 * id + 1]); });
+        nodePaths.set(id, p);
+      }
+      geometries.set(key, { key, labels, nodePaths, trails: new Map() });
+    }
+    return geometries.get(key);
+  }
+
+  const bundledAvailable = (state) => view.index.model(view.dataset, view.model).trails.includes(view.projection)
+    && (state.mode === "layer" || view.config.t1Layers.includes(state.layer));
+
+  /** Trails of a geometry at a strength: "none" = straight segments; else the bundled t-SNE file (loaded once). */
+  async function trailsFor(state, geometry, strength) {
+    if (geometry.trails.has(strength)) return geometry.trails.get(strength);
+    let trails;
+    if (strength === "none") {
+      trails = new Map([...geometry.nodePaths].map(([id, p]) => [id, straightTrail(p, 4)]));
+    } else {
+      const file = await data.trails(view.dataset, view.model, state.mode, state.mode === "epoch" ? state.layer : state.epoch);
+      trails = new Map();
+      for (let id = 0; id < view.config.n; id++) {
+        const t = file.trail(strength, id);
+        const p = new Float32Array(t.length);
+        for (let i = 0; i < t.length; i += 2) { p[i] = x(t[i]); p[i + 1] = y(t[i + 1]); }
+        trails.set(id, p);
+      }
+    }
+    geometry.trails.set(strength, trails);
+    return trails;
+  }
+
+  async function updatePaths(state) {
+    const token = ++pathToken;
+    if (!state.showAll || !isReady(state)) {
+      paths.hide();
+      drawnPaths = null;
+      return;
+    }
+    const geometry = geometryFor(state);
+    const strength = state.bundling !== "none" && bundledAvailable(state) ? state.bundling : "none";
+    let trails;
+    try {
+      trails = await trailsFor(state, geometry, strength);
+    } catch (err) {
+      console.error(err);
+      return;
+    }
+    const now = store.state;
+    if (token !== pathToken || !now.showAll || geometryKey(now) !== geometry.key) return;
+    let animate = null;
+    if (!drawnPaths || drawnPaths.geometry !== geometry.key) animate = "in";
+    else if (drawnPaths.strength !== strength) animate = "morph";
+    paths.render({
+      trails, ids, labels: view.config.labels, k: 4, steps: geometry.labels.length,
+      pass: (id) => passes(nodes.get(id), now), anyFilter: filtersActive(now),
+    }, animate);
+    drawnPaths = { geometry: geometry.key, strength };
+    trajectoryG.raise();
+  }
+
+  /**
+   * The unbundled trajectory (§4.3): pinned point (if "Show trajectory" is on) and, in the path view, the hovered
+   * one: a 2.5 px polyline with a dot + label at every step, the current step filled.
+   */
+  function renderTrajectory(state) {
+    if (!isReady(state)) return;
+    const shownIds = [];
+    if (state.pinned !== null && state.trajectory) shownIds.push(state.pinned);
+    if (state.showAll && state.hovered !== null && state.hovered !== state.pinned) shownIds.push(state.hovered);
+    const geometry = shownIds.length ? geometryFor(state) : null;
+    const { current } = shownIds.length ? stepFrames(state) : { current: -1 };
+
+    const traj = trajectoryG.selectAll(".traj").data(shownIds, (id) => id).join((enter) => {
+      const g = enter.append("g").attr("class", "traj");
+      g.append("path").attr("class", "traj-line");
+      return g;
+    });
+    traj.select(".traj-line")
+      .attr("stroke", (id) => CLASS_COLORS[view.config.labels[id]])
+      .attr("d", (id) => d3.line()(d3.range(geometry.labels.length).map((s) => {
+        const p = geometry.nodePaths.get(id);
+        return [p[2 * s], p[2 * s + 1]];
+      })));
+    traj.selectAll(".traj-step")
+      .data((id) => geometry.labels.map((label, s) => ({ id, s, label, p: geometry.nodePaths.get(id) })))
+      .join((enter) => {
+        const g = enter.append("g").attr("class", "traj-step");
+        const glyph = g.append("g").attr("class", "glyph");
+        glyph.append("circle").attr("r", 3.5);
+        glyph.append("text").attr("x", 6).attr("y", -6);
+        return g;
+      })
+      .attr("transform", (d) => `translate(${d.p[2 * d.s]},${d.p[2 * d.s + 1]})`)
+      .classed("current", (d) => d.s === current)
+      .call((g) => g.select(".glyph").attr("transform", glyphScale()))
+      .call((g) => g.select("circle").attr("stroke", (d) => CLASS_COLORS[view.config.labels[d.id]]))
+      .call((g) => g.select("text").text((d) => d.label));
+    trajectoryG.raise();
+  }
+
+  function renderComet(moveMs) {
+    cometG.selectAll(".comet-dot").data(comet).join((enter) => {
+      const g = enter.append("g").attr("class", "comet-dot");
+      g.append("g").attr("class", "glyph").append("circle").attr("r", radius);
+      return g;
+    })
+      .attr("transform", (p) => `translate(${p[0]},${p[1]})`)
+      .call((g) => g.select(".glyph").attr("transform", glyphScale()))
+      .style("fill", () => (store.state.pinned !== null ? CLASS_COLORS[view.config.labels[store.state.pinned]] : INK))
+      .transition("comet").duration(moveMs)
+      .style("opacity", (p, i) => COMET[i]);
+  }
+
+  function clearComet() {
+    comet = [];
+    cometG.selectAll("*").remove();
   }
 
   // ------------------------------------------------------------------ badges
@@ -419,36 +611,75 @@ export function initScatter(container, { store, tools }) {
     row.delta.text(`${arrow} ${magnitude}`);
   }
 
-  // ------------------------------------------------------------------ legend (filter by class)
-  function renderLegendItems() {
-    legendItems.selectAll(".legend-item")
-      .data(view.config.classes.map((name, cls) => ({ name, cls })), (d) => `${view.dataset}:${d.cls}`)
+  // ------------------------------------------------------------------ legend (depends on "Color by")
+  /** Legend entries: { key, name, swatch: { shape, color }, cls (class filter), count(d) }. */
+  function legendEntries(state) {
+    const { config } = view;
+    if (state.colorBy === "correctness") {
+      return [
+        { key: "ok", name: "correct", swatch: { shape: "circle", color: CORRECT_GRAY }, count: (d) => d.pred === d.label },
+        { key: "wrong", name: "misclassified", swatch: { shape: "triangle", color: INK }, count: (d) => d.pred !== d.label },
+      ];
+    }
+    if (state.colorBy === "learnedAt") {
+      const n = config.epochs.length;
+      return config.epochs.map((epoch, i) => ({
+        key: `l${i}`, name: `epoch ${epoch}`, swatch: { shape: "square", color: learnedColor(i, n) },
+        count: (d) => d.learnedAt === i,
+      })).concat({ key: "never", name: "never learned", swatch: { shape: "hollow", color: INK }, count: (d) => d.learnedAt < 0 });
+    }
+    return config.classes.map((name, cls) => ({
+      key: `c${cls}`, name, cls, swatch: { shape: "circle", color: CLASS_COLORS[cls] }, count: (d) => d.label === cls,
+    }));
+  }
+
+  const SWATCH = { circle: d3.symbolCircle, triangle: d3.symbolTriangle, hollow: d3.symbolTriangle, square: d3.symbolSquare };
+
+  function renderLegend(state) {
+    const entries = legendEntries(state);
+    const byClass = state.colorBy === "class";
+    legend.classed("by-class", byClass);
+    legend.select(".legend-title").text({ class: "Legend", correctness: "Correctness", learnedAt: "Learned at" }[state.colorBy]);
+    legendItems.selectAll(".legend-item").data(entries, (d) => `${view.dataset}:${state.colorBy}:${d.key}`)
       .join((enter) => {
         const item = enter.append("button").attr("type", "button").attr("class", "legend-item")
-          .on("click", (event, d) => store.toggleInSet("classFilter", d.cls, { exclusive: !event.shiftKey }))
-          .on("dblclick", () => store.set({ classFilter: null }))
-          .on("mouseenter", (event, d) => { legendHover = d.cls; restyle(store.state); })
-          .on("mouseleave", () => { legendHover = null; restyle(store.state); });
-        item.append("span").attr("class", "chip");
+          .on("click", (event, d) => {
+            if (d.cls !== undefined) store.toggleInSet("classFilter", d.cls, { exclusive: !event.shiftKey });
+          })
+          .on("dblclick", (event, d) => { if (d.cls !== undefined) store.set({ classFilter: null }); })
+          .on("mouseenter", (event, d) => { if (d.cls !== undefined) { legendHover = d.cls; restyle(store.state); } })
+          .on("mouseleave", () => { if (legendHover !== null) { legendHover = null; restyle(store.state); } });
+        item.append("svg").attr("class", "swatch").attr("width", 10).attr("height", 10).attr("viewBox", "-5 -5 10 10")
+          .append("path");
         item.append("span").attr("class", "legend-name");
         item.append("span").attr("class", "legend-count");
         return item;
       })
-      .attr("title", (d) => `${d.name}: click to isolate, Shift + click to add, double-click to show all`)
-      .call((item) => item.select(".chip").style("background", (d) => CLASS_COLORS[d.cls]))
+      .property("disabled", (d) => d.cls === undefined)
+      .attr("title", (d) => (d.cls !== undefined
+        ? `${d.name}: click to isolate, Shift + click to add, double-click to show all` : null))
+      .call((item) => item.select(".swatch path")
+        .attr("d", (d) => d3.symbol(SWATCH[d.swatch.shape], d.swatch.shape === "square" ? 64 : 50)())
+        .attr("fill", (d) => (d.swatch.shape === "hollow" ? "none" : d.swatch.color))
+        .attr("stroke", (d) => (d.swatch.shape === "hollow" ? d.swatch.color : "none")))
       .call((item) => item.select(".legend-name").text((d) => d.name));
+
+    legendKey.selectAll("*").remove();
+    if (byClass) {
+      legendKey.append("svg").attr("width", 12).attr("height", 12).attr("viewBox", "-6 -6 12 12")
+        .append("path").attr("d", d3.symbol(d3.symbolTriangle, 40)());
+      legendKey.append("span").text("misclassified (predicted class color)");
+    }
+    legendKey.style("display", byClass ? null : "none");
+    if (shown) renderLegendCounts(state);
   }
 
   function renderLegendCounts(state) {
-    const counts = new Array(view.config.nClasses).fill(0);
-    for (const id of ids) {
-      const d = nodes.get(id);
-      if (passes(d, state, { ignoreClass: true })) counts[d.label]++;
-    }
+    const visible = ids.map((id) => nodes.get(id)).filter((d) => passes(d, state, { ignoreClass: true }));
     legendItems.selectAll(".legend-item")
-      .classed("off", (d) => Boolean(state.classFilter && !state.classFilter.has(d.cls)))
-      .attr("aria-pressed", (d) => String(Boolean(state.classFilter?.has(d.cls))))
-      .select(".legend-count").text((d) => counts[d.cls]);
+      .classed("off", (d) => d.cls !== undefined && Boolean(state.classFilter && !state.classFilter.has(d.cls)))
+      .attr("aria-pressed", (d) => (d.cls !== undefined ? String(Boolean(state.classFilter?.has(d.cls))) : null))
+      .select(".legend-count").text((d) => visible.filter(d.count).length);
   }
 
   // The legend starts in the free space left of the square plot when there is room (so it hides no points), else
@@ -467,7 +698,8 @@ export function initScatter(container, { store, tools }) {
   function placeLegend() {
     const width = legend.node().offsetWidth;
     const outside = sideSpace() >= width + 2 * LEGEND_MARGIN;
-    legend.style("left", `${outside ? -(width + LEGEND_MARGIN) : LEGEND_MARGIN}px`).style("top", `${outside ? 0 : LEGEND_MARGIN}px`);
+    legend.style("left", `${outside ? -(width + LEGEND_MARGIN) : LEGEND_MARGIN}px`)
+      .style("top", `${outside ? 0 : LEGEND_MARGIN}px`);
   }
 
   function moveLegend(dx = 0, dy = 0) {
@@ -493,10 +725,16 @@ export function initScatter(container, { store, tools }) {
     svg.call(zoom.transform, d3.zoomIdentity);
     if (legendDragged) moveLegend();
     else placeLegend();
+    geometries.clear(); // trails are cached in base px
     if (shown && isReady(store.state)) {
       const state = store.state;
       shown = { ...shown, layer: null };
+      clearComet();
       draw(state, {});
+      drawnPaths = null;
+      paths.clear();
+      updatePaths(state);
+      renderTrajectory(state);
     } else {
       render(store.state);
     }
@@ -504,7 +742,7 @@ export function initScatter(container, { store, tools }) {
   new ResizeObserver(layout).observe(container);
 
   store.subscribe(render, ["mode", "layer", "epoch", "sampleSize", "classFilter", "cellFilter", "brushed",
-    "hovered", "pinned"]);
+    "hovered", "pinned", "colorBy", "showAll", "bundling", "cellHover", "trajectory", "playing"]);
 
   return {
     setConfiguration(next) {

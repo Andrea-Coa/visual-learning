@@ -62,3 +62,32 @@ export function sampleAccuracy(preds, ids, labels) {
   for (const id of ids) if (preds[id] === labels[id]) correct++;
   return correct / ids.length;
 }
+
+/** Confusion counts of the observations in `ids`: counts[truth * n + pred] (rows = true class, columns = predicted). */
+export function confusionMatrix(preds, labels, ids, nClasses) {
+  const counts = new Uint32Array(nClasses * nClasses);
+  for (const id of ids) counts[labels[id] * nClasses + preds[id]]++;
+  return counts;
+}
+
+/** Per-class recall (class accuracy), precision and F1 from confusion counts; NaN where undefined (0 / 0). */
+export function perClassScores(counts, nClasses) {
+  const recall = [];
+  const precision = [];
+  const f1 = [];
+  for (let c = 0; c < nClasses; c++) {
+    let row = 0;
+    let col = 0;
+    for (let k = 0; k < nClasses; k++) {
+      row += counts[c * nClasses + k];
+      col += counts[k * nClasses + c];
+    }
+    const tp = counts[c * nClasses + c];
+    const r = row ? tp / row : NaN;
+    const p = col ? tp / col : NaN;
+    recall.push(r);
+    precision.push(p);
+    f1.push(r + p > 0 ? (2 * r * p) / (r + p) : r === 0 || p === 0 ? 0 : NaN);
+  }
+  return { recall, precision, f1 };
+}
