@@ -168,6 +168,16 @@ export class Coords {
   }
 }
 
+/**
+ * The frame shown for (mode, layer, epoch value). In T1 the Input layer has no frames of its own (raw pixels do
+ * not change during training), so its T2 frame is used.
+ */
+export function frameOf(config, coords, { mode, layer, epoch }) {
+  const e = config.epochIndex(epoch);
+  if (mode === "epoch" && coords.t1[layer]) return coords.t1[layer][e];
+  return coords.t2[e][config.t2Layers.indexOf(layer)];
+}
+
 /** Bundled trails of one view: trail(strength, id) is a Float32Array [x0, y0, ...] in [0, 1]. */
 export class Trails {
   constructor(raw) {

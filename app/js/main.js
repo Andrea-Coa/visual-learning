@@ -4,6 +4,7 @@ import { initControls } from "./controls.js";
 import { DataStore } from "./data.js";
 import { initScatter } from "./scatter.js";
 import { Store } from "./state.js";
+import { initSteppers } from "./steppers.js";
 
 const PROJECTION_NAMES = { tsne: "t-SNE", pca: "PCA" };
 
@@ -42,7 +43,7 @@ function renderTitle(state) {
 }
 
 let loadToken = 0;
-let scatter = null;
+const panels = [];   // views that receive every loaded configuration via setConfiguration()
 
 /** Loads the selected configuration, fills in the state keys that depend on it (layer, epoch), updates the views. */
 async function loadConfiguration(state) {
@@ -64,7 +65,8 @@ async function loadConfiguration(state) {
     plotMessage("");
     renderTitle(store.state);
     const { dataset, model, projection } = state;
-    scatter.setConfiguration({ index, config, coords, dataset, model, projection, spriteUrl: data.spriteUrl(dataset) });
+    const view = { index, config, coords, dataset, model, projection, spriteUrl: data.spriteUrl(dataset) };
+    for (const panel of panels) panel.setConfiguration(view);
   } catch (err) {
     if (token === loadToken) plotMessage(`Could not load the data (${err.message}).`, "error");
     console.error(err);
@@ -74,7 +76,10 @@ async function loadConfiguration(state) {
 async function main() {
   current.index = await data.index();
   initControls(document.getElementById("controls"), { store, index: current.index });
-  scatter = initScatter(plot, { store, tools: document.getElementById("embeddings-tools") });
+  panels.push(
+    initScatter(plot, { store, tools: document.getElementById("embeddings-tools") }),
+    initSteppers(document.getElementById("steppers"), { store }),
+  );
   store.subscribe(loadConfiguration, ["dataset", "model", "projection"]);
   store.subscribe(renderTitle, ["mode", "layer", "epoch"]);
   await loadConfiguration(store.state);

@@ -42,6 +42,19 @@ export function neighborhoodHit(frame, ids, labels, k = 6) {
   return hits / (n * k);
 }
 
+const nhCache = new WeakMap(); // frame -> Map(key -> NH)
+
+/**
+ * neighborhoodHit() memoized per frame. `ids` must be a prefix of the fixed sample order, so its length identifies
+ * it (pass another `key` otherwise).
+ */
+export function cachedNeighborhoodHit(frame, ids, labels, k = 6, key = `${ids.length}:${k}`) {
+  if (!nhCache.has(frame)) nhCache.set(frame, new Map());
+  const byKey = nhCache.get(frame);
+  if (!byKey.has(key)) byKey.set(key, neighborhoodHit(frame, ids, labels, k));
+  return byKey.get(key);
+}
+
 /** Share of the observations in `ids` whose prediction equals their label. */
 export function sampleAccuracy(preds, ids, labels) {
   if (ids.length === 0) return NaN;

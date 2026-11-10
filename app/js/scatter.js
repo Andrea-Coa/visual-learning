@@ -2,7 +2,8 @@
 // Every observation is an SVG group keyed by its id, so selections survive epoch/layer changes and the points can
 // move between frames. Positions live in "base" pixels; zoom/pan transforms the whole layer and scales every glyph
 // back by 1/k, so the point size stays constant while zooming.
-import { neighborhoodHit, sampleAccuracy } from "./metrics.js";
+import { frameOf } from "./data.js";
+import { cachedNeighborhoodHit, sampleAccuracy } from "./metrics.js";
 import { infoIcon, tooltip } from "./ui.js";
 
 export const CLASS_COLORS = d3.schemeCategory10;  // = matplotlib tab10, the colors of the paper's figures
@@ -14,24 +15,26 @@ const PAD = 16;            // px between the frame and the outermost points
 const MAX_ZOOM = 8;
 const HOVER_DELAY = 80;    // ms before the tooltip appears
 const NH_K = 6;
+const LEGEND_MARGIN = 8;   // px between the legend and the plot frame
 const DURATION = { move: 750, swapOut: 200, swapIn: 200, sample: 300, fade: 250, reset: 400 };
 
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-const ms = (duration) => (reducedMotion.matches ? 0 : duration);
+export const ms = (duration) => (reducedMotion.matches ? 0 : duration);
+export const MOVE_MS = DURATION.move;
 
 const NH_INFO = "NH (neighborhood hit): share of each point's 6 nearest neighbors in this projection that have "
   + "its class. Sample acc: accuracy of the shown points at this epoch. ▲ ▼: change from the previous step.";
 
 /** The frame shown for a state, and the frame of the previous step of the active dimension (null at the first). */
 function framesFor(config, coords, state) {
+  const frame = frameOf(config, coords, state);
   const e = config.epochIndex(state.epoch);
   const l = config.t2Layers.indexOf(state.layer);
   if (state.mode === "epoch") {
-    const sequence = coords.t1[state.layer];
-    if (!sequence) return { frame: coords.t2[e][l], previous: null }; // Input: raw pixels don't change with training
-    return { frame: sequence[e], previous: e > 0 ? sequence[e - 1] : null };
+    const sequence = coords.t1[state.layer]; // undefined for Input, whose frame doesn't change with training
+    return { frame, previous: sequence && e > 0 ? sequence[e - 1] : null };
   }
-  return { frame: coords.t2[e][l], previous: l > 0 ? coords.t2[e][l - 1] : null };
+  return { frame, previous: l > 0 ? coords.t2[e][l - 1] : null };
 }
 
 /** Whether observation `d` passes the active filters (they combine with AND; VIS_PLAN.md §3). */
@@ -61,7 +64,6 @@ export function initScatter(container, { store, tools }) {
   let lastPointer = null;
   let ids = [];                 // observation ids currently drawn (the sample)
   const nodes = new Map();      // id -> datum { id, label, x, y, pred, drawnPred }, reused across steps
-  const nhCache = new WeakMap(); // frame -> Map(sample size -> NH)
   const x = d3.scaleLinear().domain([0, 1]);
   const y = d3.scaleLinear().domain([0, 1]);
 
@@ -291,6 +293,7 @@ export function initScatter(container, { store, tools }) {
         if (!isReady(state)) return;
         svg.call(zoom.transform, d3.zoomIdentity);
         renderLegendItems();
+        if (!legendDragged) placeLegend(); // class names change the legend width (e.g. CIFAR-10)
         draw(state, {});
         zoomLayer.transition("swap").duration(ms(DURATION.swapIn)).style("opacity", 1);
       });
@@ -334,10 +337,11 @@ export function initScatter(container, { store, tools }) {
         },
       );
 
+    const moveMs = ms(DURATION.move) / (state.playing ? state.speed : 1); // Play speed scales the motion (§6)
     if (move) {
-      points.transition("move").duration(ms(DURATION.move)).ease(d3.easeCubicInOut).attr("transform", position);
+      points.transition("move").duration(moveMs).ease(d3.easeCubicInOut).attr("transform", position);
       // Glyph changes (circle <-> triangle, predicted color) happen at mid-transition (§6).
-      points.transition("glyph").delay(ms(DURATION.move / 2)).duration(0).on("start", function (d) {
+      points.transition("glyph").delay(moveMs / 2).duration(0).on("start", function (d) {
         d.drawnPred = d.pred;
         paintGlyph(d3.select(this).select("path"), d, store.state);
       });
@@ -347,7 +351,7 @@ export function initScatter(container, { store, tools }) {
     if (radiusChanged) symbolCache.clear();
 
     shown = { key: keyOf(state), layer: state.layer, epoch: state.epoch, n: state.sampleSize };
-    renderBadges(state, frame, previous, move);
+    renderBadges(state, frame, previous, move ? moveMs : 0);
     restyle(state, { fade: true });
   }
 
@@ -384,27 +388,23 @@ export function initScatter(container, { store, tools }) {
   }
 
   // ------------------------------------------------------------------ badges
-  function nhOf(frame) {
-    if (!nhCache.has(frame)) nhCache.set(frame, new Map());
-    const byN = nhCache.get(frame);
-    if (!byN.has(ids.length)) byN.set(ids.length, neighborhoodHit(frame, ids, view.config.labels, NH_K));
-    return byN.get(ids.length);
-  }
+  const nhOf = (frame) => cachedNeighborhoodHit(frame, ids, view.config.labels, NH_K);
 
-  function renderBadges(state, frame, previous, animate) {
+  /** `tweenMs` > 0 tweens the numbers in sync with the point motion. */
+  function renderBadges(state, frame, previous, tweenMs) {
     const { config } = view;
     const e = config.epochIndex(state.epoch);
     const acc = sampleAccuracy(config.preds[e], ids, config.labels);
     const accPrevious = state.mode === "epoch" && e > 0 ? sampleAccuracy(config.preds[e - 1], ids, config.labels) : null;
-    setBadge(badgeRows.nh, nhOf(frame), previous ? nhOf(previous) : null, (v) => v.toFixed(2), animate);
-    setBadge(badgeRows.acc, acc, accPrevious, (v) => `${(v * 100).toFixed(1)} %`, animate);
+    setBadge(badgeRows.nh, nhOf(frame), previous ? nhOf(previous) : null, (v) => v.toFixed(2), tweenMs);
+    setBadge(badgeRows.acc, acc, accPrevious, (v) => `${(v * 100).toFixed(1)} %`, tweenMs);
   }
 
-  function setBadge(row, value, previous, format, animate) {
+  function setBadge(row, value, previous, format, tweenMs) {
     const node = row.value.node();
     const from = node.__value ?? value;
     node.__value = value;
-    row.value.transition("tween").duration(animate ? ms(DURATION.move) : 0).ease(d3.easeCubicInOut)
+    row.value.transition("tween").duration(tweenMs).ease(d3.easeCubicInOut)
       .tween("text", () => {
         const interpolate = d3.interpolateNumber(from, value);
         return (t) => { node.textContent = format(interpolate(t)); };
@@ -451,15 +451,29 @@ export function initScatter(container, { store, tools }) {
       .select(".legend-count").text((d) => counts[d.cls]);
   }
 
-  // The legend can be dragged by its header inside the plot.
+  // The legend starts in the free space left of the square plot when there is room (so it hides no points), else
+  // inside its top-left corner; it can be dragged by its header anywhere in the plot area.
+  let legendDragged = false;
   legendHeader.call(d3.drag()
     .container(root.node())
     .filter((event) => !event.button && !event.target.closest("button"))
-    .on("drag", (event) => moveLegend(event.dx, event.dy)));
+    .on("drag", (event) => {
+      legendDragged = true;
+      moveLegend(event.dx, event.dy);
+    }));
+
+  const sideSpace = () => Math.max(0, Math.floor((container.clientWidth - size) / 2));
+
+  function placeLegend() {
+    const width = legend.node().offsetWidth;
+    const outside = sideSpace() >= width + 2 * LEGEND_MARGIN;
+    legend.style("left", `${outside ? -(width + LEGEND_MARGIN) : LEGEND_MARGIN}px`).style("top", `${outside ? 0 : LEGEND_MARGIN}px`);
+  }
 
   function moveLegend(dx = 0, dy = 0) {
     const node = legend.node();
-    const left = Math.max(0, Math.min(size - node.offsetWidth, node.offsetLeft + dx));
+    const free = sideSpace();
+    const left = Math.max(-free, Math.min(size + free - node.offsetWidth, node.offsetLeft + dx));
     const top = Math.max(0, Math.min(size - node.offsetHeight, node.offsetTop + dy));
     legend.style("left", `${left}px`).style("top", `${top}px`);
   }
@@ -477,7 +491,8 @@ export function initScatter(container, { store, tools }) {
     y.range([PAD, size - PAD]);
     zoom.extent([[0, 0], [size, size]]).translateExtent([[0, 0], [size, size]]);
     svg.call(zoom.transform, d3.zoomIdentity);
-    moveLegend();
+    if (legendDragged) moveLegend();
+    else placeLegend();
     if (shown && isReady(store.state)) {
       const state = store.state;
       shown = { ...shown, layer: null };

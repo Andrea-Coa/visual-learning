@@ -276,7 +276,104 @@ select.control-input:disabled {
   background-color: var(--panel);
 }
 .plot-message[hidden] { display: none; }
-.steppers { flex: none; }
+/* ---------------------------------------------------------------- steppers + Play (VIS_PLAN.md §5.5) */
+
+.steppers {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.stepper-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;   /* LEAD_WIDTH in steppers.js */
+  align-items: center;
+  gap: 6px;
+}
+.stepper-row.has-film { align-items: start; }
+.stepper-lead { display: flex; align-items: center; gap: 8px; }
+.stepper-row.has-film .stepper-lead,
+.stepper-row.has-film .stepper-tail { padding-top: calc(var(--thumb) / 2 - 14px); }  /* centered on the thumbnails */
+.stepper-label {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.stepper-row.active .stepper-label { color: var(--text); }
+.stepper-steps { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; overflow: hidden; }
+.stepper-tail { display: flex; align-items: center; gap: 6px; }
+
+.play-btn,
+.play-spacer { flex: none; width: 28px; height: 28px; }
+.play-btn {
+  position: relative;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  cursor: pointer;
+}
+.play-btn::before {           /* ▶ */
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 11px;
+  border-style: solid;
+  border-width: 6px 0 6px 9px;
+  border-color: transparent transparent transparent #fff;
+}
+.play-btn.playing::before {   /* ❚❚ = two 3 px bars, 2 px apart */
+  top: 9px;
+  left: 10px;
+  width: 2px;
+  height: 10px;
+  box-sizing: content-box;
+  border-width: 0 3px;
+  border-color: #fff;
+}
+.play-btn:hover { background: #000; }
+
+.seg.compact .step { height: 22px; padding: 0 8px; font-variant-numeric: tabular-nums; }
+.seg button.current { background: var(--ink); color: #fff; }
+.seg button:disabled { color: var(--faint); background: var(--panel-header); cursor: not-allowed; }
+.all-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+.filmstrip { display: flex; gap: 6px; }  /* GAP in steppers.js */
+.step-thumb {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.step-thumb canvas {
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+.step-thumb:hover canvas { border-color: var(--border-strong); }
+.step-thumb.current { color: var(--text); font-weight: 600; }
+.step-thumb.current canvas { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.step-thumb:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.stepper-axis { display: block; margin-top: 2px; overflow: visible; }
+.stepper-axis line { stroke: var(--border-strong); stroke-width: 1px; }
+.stepper-axis .axis-base { stroke: var(--faint); }
+.stepper-axis circle { fill: var(--faint); }
+.stepper-axis .current line { stroke: var(--ink); }
+.stepper-axis .current circle { fill: var(--ink); }
 
 /* ---------------------------------------------------------------- embeddings toolbar (panel title) */
 

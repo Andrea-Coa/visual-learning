@@ -250,6 +250,7 @@ The site lives under `/visual-learning/`, so all paths in the code are relative.
 | `ui.js` | shared floating tooltip and ⓘ info icons |
 | `scatter.js` | embeddings view, scatter mode (`VIS_PLAN.md` §5.4): points, legend, zoom/pan, brush, tooltip, pin, badges |
 | `metrics.js` | neighborhood hit and sample accuracy, computed on the shown points |
+| `steppers.js` | layer / epoch rows (canvas filmstrip), Play, speed, All, keyboard shortcuts (`VIS_PLAN.md` §5.5) |
 
 `data.js` and `state.js` use neither D3 nor the DOM, so they can be tested with Node. In the browser console,
 `app.store.set({ dataset: "svhn" })` changes the state by hand.
