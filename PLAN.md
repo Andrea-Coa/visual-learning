@@ -225,6 +225,8 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
   > Switching to T1 while on Input moves to the first hidden layer. Shared helpers: `frameOf` (data.js),
   > `cachedNeighborhoodHit` (metrics.js). Legend now starts outside the square plot when there is side room.
   > Not done: the ▶/All "slide" on mode switch (rows are rebuilt instantly); comet tail is 7.8.
+  > note (2026-11-10, later): reorganized to follow draft-v2: the steppers are now two compact rows overlaid at the
+  > bottom-right of the plot; the canvas filmstrip and the time axis were removed (NH per step is in the tooltip).
   > note (testing): ResizeObserver also doesn't fire under `--virtual-time-budget` after load; test widths with
   > `--window-size` instead.
 - [x] 7.4 Path view (§4.3, §5.4): trails at none/medium/strong, draw-in animation, pinned unbundled trajectory.
@@ -303,4 +305,5 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 | 2026-11-10 | Claude | Full check on macOS (no `raw/`, no `.venv`): pipeline compiles, `app/data/` consistent (only ±1 rounding on trail endpoints), all 6 configs × 2 methods + trails load in Chrome. 7.1 controls panel done (`controls.js`, `ui.js`). Next: 7.2 scatter. |
 | 2026-11-10 | Claude | 7.2 scatter done (`scatter.js`, `metrics.js`): glyphs, legend filter, zoom/pan, brush, tooltip, pin, NH/acc badges, §6 animations of the scatter; 29-check browser test passes. Next: 7.3 steppers + Play. |
 | 2026-11-10 | Claude | 7.3 done (`steppers.js`): filmstrip rows, Play/speed/All, keyboard, time axis; legend placed outside the plot when room. Steppers test (33 checks) + scatter regression (29) pass; screenshots at 1920 / 1300 px. Next: 7.4 path view. |
+| 2026-11-10 | Claude | Layout reorganized to match `drafts/draft-v2.png` and never scroll (user request): steppers as compact rows inside the plot (filmstrip dropped), legend bottom-left, plot fills the panel, paged image view, panels sized to their height, `<details>` → collapsible sections. 4 suites + no-scroll check at 1280×720 … 2560×1440 pass. |
 | 2026-11-10 | Claude | 7.4–7.9 done (path view, curve, architecture, metrics, images, data point, color-by, comet, chips; layout fixes). 8.1/8.2/8.4/8.5/8.6 done (README rationale + findings, `package.py`, `app.py`, `PRESENTATION.md`). Left for the user: 6.6 Pages setting + push, 8.3 Firefox check. |

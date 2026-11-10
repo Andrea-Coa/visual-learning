@@ -57,10 +57,15 @@ Three columns, same structure as draft-v2. Additions to the draft are marked ★
 └───────────────────┴──────────────────────────────────────────────────┴─────────────────────┘
 ```
 
-- **Widths:** left 260 px, right 320 px, center flexible (≥ 760 px). Minimum supported viewport 1280×720;
-  below that the right column stacks under the center.
-- **Heights (center):** embeddings view ≈ 62 %, steppers ≈ 10 %, image view the rest (scrolls internally).
-- The embeddings plot is **square** (same scale on both axes; t-SNE distances must not be distorted).
+- **As built (2026-11-10, user request: follow draft-v2 exactly, no scrolling):** columns 24 / 50 / 26 % of the
+  width; center = embeddings 66 % + image view 34 %; right = model metrics 63 % + data point 37 %; left = brand,
+  controls, architecture, learning curve. **Nothing scrolls** at any viewport ≥ 1280×720: charts size themselves to
+  their panel, the image view is paged, and short viewports get a compact variant of the left column.
+- The Layer / Epoch steppers are two compact rows **inside the plot, bottom-right** (draft-v2), and the legend is
+  inside the plot, bottom-left. The filmstrip of §5.5 was dropped (it does not appear in the draft); the NH of each
+  step is in the step tooltip instead.
+- The embeddings plot fills the panel; the data keep the **same scale on both axes** (a centered square above the
+  steppers), so t-SNE distances are not distorted.
 - Collapsible panels (▾) as in the draft: Model Metrics and Data Point can be collapsed to give space.
 
 ---

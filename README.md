@@ -266,7 +266,7 @@ The site lives under `/visual-learning/`, so all paths in the code are relative.
 | `scatter.js` | embeddings view (`VIS_PLAN.md` §5.4): points, legend, zoom/pan, brush, tooltip, pin, badges, path view, trajectory |
 | `paths.js` | trails of the path view: grouped SVG paths, draw-in, morph between bundling strengths, hit testing |
 | `metrics.js` | neighborhood hit, sample accuracy, confusion matrix, per-class recall / precision / F1 |
-| `steppers.js` | layer / epoch rows (canvas filmstrip), Play, speed, All, keyboard shortcuts (`VIS_PLAN.md` §5.5) |
+| `steppers.js` | layer / epoch rows inside the plot (draft-v2), Play, speed, All, keyboard shortcuts (`VIS_PLAN.md` §5.5) |
 | `architecture.js` | architecture panel with the NH separation bars (`VIS_PLAN.md` §5.2) |
 | `curve.js` | learning curve with the current-epoch marker (`VIS_PLAN.md` §5.3) |
 | `model-metrics.js` | confusion matrix and per-class bars at the current epoch (`VIS_PLAN.md` §5.7) |
@@ -313,7 +313,7 @@ All JSON is compact. **Coordinates** are integers `0..9999` in the unit square, 
   Procrustes-aligned) is offered for contrast: it keeps global variance and shows how much t-SNE "cleans up".
 - **Quality you can read.** The neighborhood hit (NH, k = 6), the paper's metric, is computed in the browser on the
   points shown, so it follows the sample size. It appears as a badge with its change from the previous step, as the
-  separation bars of the architecture panel and in the filmstrip tooltips. Sample accuracy sits next to it.
+  separation bars of the architecture panel and in the tooltips of the Layer / Epoch steps. Sample accuracy sits next to it.
 - **Encodings.** Hue = true class (`schemeCategory10` = matplotlib tab10, the paper's colors); misclassified points
   are triangles in the **predicted** class color (paper convention), so errors are visible without another panel.
   UI chrome is gray / near-black, so a saturated color always means a class; selection is a black ring. Trails use
@@ -324,15 +324,16 @@ All JSON is compact. **Coordinates** are integers `0..9999` in the unit square, 
   softmax, curve marker, separation bars) tweens in sync. The path view draws all steps at once as trails bundled
   with our own KDE edge bundling (the CPU counterpart of the paper's GPU bundling), **class-aware** so that a bundle
   never mixes hues; trails draw in by segment and morph between bundling strengths.
-- **Visualization mantra.** *Overview*: path view, filmstrip of mini scatterplots, learning curve, separation bars.
+- **Layout.** The panels follow the team's mockup (`drafts/draft-v2.png`) and nothing scrolls: every chart sizes
+  itself to its panel and the image view is paged, so the whole state is visible at once on a projector.
+- **Visualization mantra.** *Overview*: path view (all steps at once), learning curve, separation bars.
   *Zoom and filter*: zoom/pan, legend, confusion cells, brush, color-by modes, sample size, bundling strength.
   *Details on demand*: tooltip with the image, pinned Data point panel (softmax, p(true) over epochs, trajectory),
   image view. All views read one shared state, so every interaction is linked.
 - **Fair comparisons.** The same 1000 test images (100 per class) are used for every model, epoch and layer; the
   sample spinner shows nested prefixes, balanced at every size. Datasets × models are all selectable.
 - **Engineering.** Everything is precomputed (static JSON, 66 MB) so the site runs on GitHub Pages and offline;
-  D3 is vendored. Trails are drawn as ~200 SVG paths (one per class × segment) instead of 10 000; the filmstrip uses
-  canvas.
+  D3 is vendored. Trails are drawn as ~200 SVG paths (one per class × segment) instead of 10 000.
 
 ## Findings
 
