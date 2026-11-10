@@ -205,8 +205,16 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
   > Controls only write state; `colorBy` / `bundling` have no visual effect until 7.4 / 7.8. Bundling is disabled unless
   > `showAll` and the projection has trails. Changing dataset keeps model/projection valid (falls back to the first
   > available). Tested in headless Chrome (interaction test in scratch, not in repo).
-- [ ] 7.2 Embeddings view, scatter mode (§5.4, §4.1–4.2): circles/triangles, title, legend filter, zoom/pan,
+- [x] 7.2 Embeddings view, scatter mode (§5.4, §4.1–4.2): circles/triangles, title, legend filter, zoom/pan,
       brush, tooltip with thumbnail, pin; NH + sample-acc badges computed in the browser.
+  > note: `js/scatter.js` (`initScatter` → `setConfiguration`, called by main.js after loading), NH / accuracy in
+  > `js/metrics.js` (browser NH = Python NH: MNIST MLP T2 h4 e50 0.96, Input 0.85). Already animates §6 for step change
+  > (750 ms move, glyph switch at mid), dataset/model/projection/mode swap (fade), sample size (grow/shrink), filters
+  > (opacity). Brush = own `d3.drag` rectangle (d3.brush's Shift = axis lock clashed with Shift+drag). In T1 the Input
+  > layer shows the T2 Input frame (no T1 frames). Esc clears pin, then brush. Loading message is now an overlay.
+  > note (testing): headless Chrome with `--virtual-time-budget` never fires `requestAnimationFrame` inside an iframe,
+  > so D3 transitions hang there. Test pages must load the app in the same window (`<base href>`) with an rAF→setTimeout
+  > shim before D3.
 - [ ] 7.3 Steppers + animation (§5.5, §6): layer/epoch rows, Play/speed on the active row, animated transitions;
       then the canvas filmstrip [S].
 - [ ] 7.4 Path view (§4.3, §5.4): trails at none/medium/strong, draw-in animation, pinned unbundled trajectory.
@@ -256,3 +264,4 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 | 2026-11-09 | Claude | Phase 5 done: `pipeline/export.py` → `app/data/` (index, meta, nodes, coords per method, trails per view, sprites; 66 MB), verified, schema in README. Next: Phase 6 (site skeleton + Pages). |
 | 2026-11-09 | Claude | Phase 6 done except the first Pages deploy (6.6, needs user): layout, vendored D3 7.9.0, `data.js`, `state.js`, `main.js`, Pages workflow; Node tests + headless-Edge screenshots. Default branch is `main` (README links fixed). Next: Phase 7.1 (controls). |
 | 2026-11-10 | Claude | Full check on macOS (no `raw/`, no `.venv`): pipeline compiles, `app/data/` consistent (only ±1 rounding on trail endpoints), all 6 configs × 2 methods + trails load in Chrome. 7.1 controls panel done (`controls.js`, `ui.js`). Next: 7.2 scatter. |
+| 2026-11-10 | Claude | 7.2 scatter done (`scatter.js`, `metrics.js`): glyphs, legend filter, zoom/pan, brush, tooltip, pin, NH/acc badges, §6 animations of the scatter; 31-check browser test passes. Next: 7.3 steppers + Play. |
