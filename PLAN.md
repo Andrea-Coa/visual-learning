@@ -1,4 +1,4 @@
-# Visual Learning — Implementation Plan
+# JaMoNA — Implementation Plan
 
 High-level plan for the DS5343 "Visual Learning Models" assignment (see `task-description.md`),
 based on Rauber et al., *Visualizing the Hidden Activity of Artificial Neural Networks* (`paper/`).
@@ -39,7 +39,7 @@ Note: the assignment's T1/T2 are *not* the paper's T1/T2. Here **T1 = inter-epoc
 ## Proposed layout
 
 ```
-visual-learning/
+jamona/
 ├── PLAN.md, CLAUDE.md, README.md, requirements.txt
 ├── pipeline/                  # Python: training + processing (runs on Colab or locally)
 │   ├── config.py              # datasets, models, epochs to snapshot, seeds, paths
@@ -70,7 +70,7 @@ visual-learning/
   > note: installed in `.venv` (Python 3.13, torch 2.15 CPU, openTSNE 1.0.4) without issues.
 - [x] 0.3 Colab notebook skeleton that installs deps, mounts Drive, and runs `pipeline/train.py`.
   > note: `notebooks/colab_train.ipynb`; no installs needed (Colab ships torch/torchvision/scipy). Not yet run on Colab.
-  > The notebook clones/pulls the GitHub repo (code) and writes outputs to Drive `MyDrive/visual-learning/raw/`. Push code changes before training.
+  > The notebook clones/pulls the GitHub repo (code) and writes outputs to Drive `MyDrive/jamona/raw/`. Push code changes before training.
 
 ## Phase 1 — Data & models
 
@@ -183,7 +183,7 @@ visual-learning/
   > note: documented in README "Run the site". `main.js` = entry point (loads the selected config, generated title,
   > loading/error states); `window.app` exposes `{data, store, current}` for the console.
 - [~] 6.6 GitHub Pages: `.github/workflows/pages.yml` uploads `app/` (repo setting: Pages → Source: GitHub Actions).
-  > note: Pages serves the site under `/visual-learning/`, so every URL in the code must be relative.
+  > note: Pages serves the site under `/jamona/`, so every URL in the code must be relative.
   > note: workflow written (triggers on pushes to `main` touching `app/`, or manually). Not run yet: needs the one-time
   > repo setting + a push by the user.
 
@@ -269,7 +269,7 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
   > note: done: local http.server + Flask wrapper (also from the extracted ZIP), Chrome headless, all 6 configs ×
   > 2 methods. Pending (user): Pages deploy (6.6) and Firefox / Safari by hand (not installed / not scriptable here).
 - [x] 8.4 Build the submission ZIP (`app/` = site + data files; exclude `.venv`, `raw/`).
-  > note: `python package.py` → `dist/visual-learning.zip` (28 MB, git-ignored). Rebuild after any change.
+  > note: `python package.py` → `dist/jamona.zip` (28 MB, git-ignored). Rebuild after any change.
   > note: 2026-11-10: `drafts/` added to the ZIP (user request) → 159 files, 28.8 MB. Rebuilt from commit 7e395bd and
   > tested from a clean extraction: `python app.py` serves every file type (200, correct MIME), full UI renders.
 - [x] 8.5 *(optional)* `app.py`: ~10-line Flask wrapper serving `app/` as static files, only if the course insists
@@ -316,3 +316,5 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 | 2026-11-10 | Claude | `DEFENSA.md` (en español): guía de defensa: pipeline, qué es del paper vs propio, NH, selector T1/T2, trayectorias en "All", t-SNE vs PCA (tabla de NH), overfitting (tabla + matices), codificación, hallazgos, preguntas difíciles. No incluida en el ZIP (`package.py`). |
 | 2026-11-11 | Claude | Re-applied after an accidental local undo (never committed): equal side columns 21 / 58 / 21 % (min 280 px); epoch label removed from the confusion matrix (now in its ⓘ); Model metrics sized to content (≤ 55 % of the column, bars ≤ 130 px) so the blank below the per-class bars goes to Data point (user choice). Checked at 1280×720 / 1920×1080 incl. collapsing either panel: no overflow. ZIP not rebuilt. |
 | 2026-11-11 | Claude | Badge deltas now signed numbers (+0.04 / −0.02 / ±0.00) instead of ▲ ▼ (triangle = misclassified). Brush is now freeform (lasso, `d3.polygonContains`; Brush mode or Shift + drag; click clears; path view brushes trail ends). Tested in headless Edge: selection = exactly the points inside the drawn shape. Docs updated (VIS_PLAN, README, DEFENSA). ZIP not rebuilt. |
+| 2026-11-11 | Claude | Project renamed to **JaMoNA** (Jimena and Andrea's Model Network Analysis); slug `jamona` in URLs, Colab/Drive paths and the ZIP. New logo `app/img/jamona.svg` (piglet + magnifying glass) in the README, site header and favicon. GitHub repo rename is up to the owner. |
+

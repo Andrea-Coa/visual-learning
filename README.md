@@ -1,4 +1,10 @@
-# Visual Learning: how a neural network learns, epoch by epoch and layer by layer
+<p align="center">
+  <img src="app/img/jamona.svg" alt="JaMoNA logo: a pink piglet holding a magnifying glass" width="160">
+</p>
+
+<h1 align="center">JaMoNA</h1>
+<p align="center"><b>Jimena and Andrea's Model Network Analysis</b><br>
+how a neural network learns, epoch by epoch and layer by layer</p>
 
 DS5343 Data Visualization (UTEC) homework. We train neural networks on **MNIST, SVHN and CIFAR-10**,
 record the hidden-layer activations of 1000 test images during training, project them to 2D with t-SNE
@@ -11,7 +17,7 @@ Based on Rauber et al., *Visualizing the Hidden Activity of Artificial Neural Ne
 The assignment is in `task-description.md`; the plan and its progress are in `PLAN.md`; the UI design spec is in
 `VIS_PLAN.md`; the in-class demo script is in `PRESENTATION.md`.
 
-**Live site:** <https://andrea-coa.github.io/visual-learning/> (GitHub Pages, see "Run the site").
+**Live site:** <https://andrea-coa.github.io/jamona/> (GitHub Pages, see "Run the site").
 **Quick start (local):** `python -m http.server 8000 -d app`, or `pip install flask && python app.py`
 (<http://127.0.0.1:5000>). Everything below "Run the site" explains the site; the sections before it rebuild the data.
 
@@ -30,7 +36,7 @@ pipeline/                 Python pipeline (runs on Colab or locally)
 notebooks/colab_train.ipynb   runs pipeline/train.py on a Colab T4
 app/                      static D3 site (HTML/CSS/JS + app/data/ JSON), deployed on GitHub Pages
 app.py                    Flask wrapper that serves app/ (the assignment asks for a Flask app)
-package.py                builds the submission ZIP (dist/visual-learning.zip)
+package.py                builds the submission ZIP (dist/jamona.zip)
 raw/                      training outputs (git-ignored, large)
 data/                     downloaded datasets (git-ignored)
 ```
@@ -58,31 +64,31 @@ As in the paper (Sec. 4), with plain SGD (lr 0.01, momentum 0.9, Keras-style lr 
 
 ### Option A: Google Colab (recommended, T4 GPU)
 
-The code comes from GitHub (`https://github.com/Andrea-Coa/visual-learning`, public, so no token needed). Only the
+The code comes from GitHub (`https://github.com/Andrea-Coa/jamona`, public, so no token needed). Only the
 **outputs** go to Google Drive, so they survive disconnects.
 
 1. **Push your changes.** Colab trains whatever is on `main` on GitHub, so push any local changes to `pipeline/` first.
 2. **Open the notebook in Colab.** Go to `File > Open notebook > GitHub`, paste the repo URL and pick
    `notebooks/colab_train.ipynb`. Or open
-   `https://colab.research.google.com/github/Andrea-Coa/visual-learning/blob/main/notebooks/colab_train.ipynb`.
+   `https://colab.research.google.com/github/Andrea-Coa/jamona/blob/main/notebooks/colab_train.ipynb`.
 3. **Select the GPU.** `Runtime > Change runtime type > T4 GPU`.
 4. **Configure.** In the configuration cell, choose which `DATASETS` / `MODELS` this account trains
    (default: all six configurations).
 5. **Run all cells** (`Runtime > Run all`, and accept the Drive permission prompt). The notebook:
-   - clones the repo to `/content/visual-learning` (or `git pull`s it if it's already there) and `cd`s into it,
-   - mounts Drive; outputs go to `MyDrive/visual-learning/raw/`, datasets to the local `/content/data`,
+   - clones the repo to `/content/jamona` (or `git pull`s it if it's already there) and `cd`s into it,
+   - mounts Drive; outputs go to `MyDrive/jamona/raw/`, datasets to the local `/content/data`,
    - runs an optional ~1 minute smoke test,
    - trains: `python -m pipeline.train --dataset ... --model ... --data-dir /content/data --out <Drive>/raw`,
    - prints a summary of final accuracies next to the paper's.
 6. **If Colab disconnects**, reconnect and run all cells again. The code is cloned again and the outputs on Drive
    are kept, so finished configurations are skipped and interrupted ones resume from the last completed epoch.
-7. **Download the results.** Download `MyDrive/visual-learning/raw/` from Drive and put it as `raw/` in the local
+7. **Download the results.** Download `MyDrive/jamona/raw/` from Drive and put it as `raw/` in the local
    project root. `raw/` is git-ignored: the outputs are too large for the repo.
 
 8. **If a configuration diverges** (the log prints `FAILED: Training loss diverged`), the run continues with the
    other configurations. Its folder on Drive keeps the diverged checkpoint, so it must be retrained from scratch.
    Fix the cause (e.g. its learning rate in `pipeline/config.py`), push, and then either delete
-   `MyDrive/visual-learning/raw/<dataset>/<model>/` in Drive and run all cells again, or run this in a new cell:
+   `MyDrive/jamona/raw/<dataset>/<model>/` in Drive and run all cells again, or run this in a new cell:
    `!python -m pipeline.train --dataset <dataset> --model <model> --restart --data-dir {DATA} --out {OUT}`.
    `--restart` deletes the previous outputs of every selected configuration, so name only the failed one.
 
@@ -107,8 +113,8 @@ train a different part (set `DATASETS` in the configuration cell). Merge them by
 ### Option B: locally
 
 ```bash
-git clone https://github.com/Andrea-Coa/visual-learning.git
-cd visual-learning
+git clone https://github.com/Andrea-Coa/jamona.git
+cd jamona
 python -m venv .venv
 .venv/Scripts/activate          # Windows (Linux/macOS: source .venv/bin/activate)
 pip install -r requirements.txt
@@ -249,9 +255,9 @@ python app.py                              # then open http://127.0.0.1:5000
 **GitHub Pages:** `.github/workflows/pages.yml` publishes `app/` on every push to `main` that changes `app/`,
 or on a manual run from the Actions tab.
 1. One-time setup on GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-2. Push. The site appears at `https://andrea-coa.github.io/visual-learning/`.
+2. Push. The site appears at `https://andrea-coa.github.io/jamona/`.
 
-The site lives under `/visual-learning/`, so all paths in the code are relative. Keep it that way.
+The site lives under `/jamona/`, so all paths in the code are relative. Keep it that way.
 
 **Code layout (`app/js/`):**
 
@@ -372,7 +378,7 @@ Numbers are t-SNE NH on all 1000 points and test accuracy (full test set, `meta.
 ## Submission ZIP
 
 ```bash
-python package.py                          # -> dist/visual-learning.zip (site + data files + Flask app + code + docs)
+python package.py                          # -> dist/jamona.zip (site + data files + Flask app + code + docs)
 ```
 
 The ZIP contains `app.py` (Flask), `app/` (site and its data files: `nodes.json` = observations, trails = edges),

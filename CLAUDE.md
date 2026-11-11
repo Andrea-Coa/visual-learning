@@ -1,4 +1,4 @@
-# Visual Learning
+# JaMoNA — Jimena and Andrea's Model Network Analysis
 
 - This is homework of a course, so do not over-engineer. Still, code must be prolific, clean, and not excessively simplified.
 

@@ -1,4 +1,4 @@
-/* Visual Learning. Neutral chrome so that the only saturated colors on screen are data (class) colors
+/* JaMoNA. Neutral chrome so that the only saturated colors on screen are data (class) colors
    (VIS_PLAN.md §4.1); panel style after the references in style-references/. */
 
 :root {
@@ -88,8 +88,12 @@ html, body {
   letter-spacing: 0.01em;
 }
 .brand-logo { width: 44px; height: 44px; flex: none; }
-.brand-logo circle { fill: var(--ink); }
-.brand-logo path { fill: none; stroke: var(--ink); stroke-width: 1.4; }
+.brand-subtitle {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  line-height: 1.25;
+}
 
 /* ---------------------------------------------------------------- panels */
 
@@ -847,6 +851,7 @@ select.control-input:disabled {
 @media (max-height: 820px) {
   .brand { padding-block: 2px 0; }
   .brand h1 { font-size: 20px; }
+  .brand-subtitle { margin-top: 1px; }
   .brand-logo { width: 34px; height: 34px; }
   .controls { gap: 4px 8px; }
   .control-input, .spinner { height: 22px; }
