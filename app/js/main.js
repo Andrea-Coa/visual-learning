@@ -78,13 +78,19 @@ async function loadConfiguration(state) {
   }
 }
 
-/** Collapsible panels (draft-v2 ▾): the title toggles the panel; the other panel of the column takes the space. */
+/**
+ * Collapsible panels (draft-v2 ▾): the title (and the arrow, where the title also holds tools) toggles the panel;
+ * the other panel of the column takes the space.
+ */
 function initCollapsible() {
   for (const button of document.querySelectorAll(".collapsible .collapse-btn")) {
     button.addEventListener("click", () => {
       const panel = button.closest(".collapsible");
       const collapsed = panel.classList.toggle("collapsed");
-      button.setAttribute("aria-expanded", String(!collapsed));
+      for (const b of panel.querySelectorAll(".collapse-btn")) b.setAttribute("aria-expanded", String(!collapsed));
+      const arrow = panel.querySelector(".collapse-arrow");
+      const name = panel.querySelector(".collapse-label")?.textContent.trim().toLowerCase() ?? "panel";
+      arrow?.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${name}`);
     });
   }
 }

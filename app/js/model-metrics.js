@@ -11,7 +11,9 @@ const METRICS = [{ id: "recall", name: "Recall (class accuracy)" }, { id: "preci
   { id: "f1", name: "F1" }];
 const M = { left: 40, top: 30 };                         // matrix header sizes
 const BARS = { top: 8, bottom: 26, left: 28, right: 4, min: 90, max: 160 };  // height = 30 % of the panel
-const HEADS = 64;   // px of the two panel-internal headers
+const HEAD_MARGINS = 26;    // px of vertical margin around the two panel-internal headers (CSS .mm-head)
+const MIN_TEXT_CELL = 12;   // px: below this cell size only the cells of ≥ 5 % show their count
+const SMALL_CELL = 16;      // px: below this cell size the counts use a smaller font
 const pct = d3.format(".0%");
 
 /** Builds the panel inside `container`. Returns { setConfiguration(view) }. */
@@ -73,7 +75,9 @@ export function initModelMetrics(container, { store }) {
     width = container.clientWidth - 20;
     const bodyHeight = container.clientHeight - 16;
     if (width <= 0 || bodyHeight <= 0) return;
-    // No scrolling (draft-v2): the matrix and the bars share the panel height.
+    // No scrolling (draft-v2): the matrix and the bars share the panel height. The headers are measured: in a
+    // narrow panel they wrap onto two lines.
+    const heads = head.node().offsetHeight + barHead.node().offsetHeight + HEAD_MARGINS;
     const barsHeight = Math.max(BARS.min, Math.min(BARS.max, Math.round(bodyHeight * 0.3)));
     const { config } = view;
     const n = config.nClasses;
@@ -88,7 +92,7 @@ export function initModelMetrics(container, { store }) {
     metricSelect.property("value", state.metric);
 
     // ---------------------------------------------------------------- matrix
-    const cell = Math.max(8, Math.floor(Math.min((width - M.left) / n, (bodyHeight - HEADS - barsHeight - M.top) / n)));
+    const cell = Math.max(8, Math.floor(Math.min((width - M.left) / n, (bodyHeight - heads - barsHeight - M.top) / n)));
     matrixSvg.attr("width", M.left + n * cell).attr("height", M.top + n * cell);
     const rowTotal = d3.range(n).map((t) => d3.sum(d3.range(n), (p) => counts[t * n + p]));
     const cells = [];
@@ -150,9 +154,13 @@ export function initModelMetrics(container, { store }) {
       .classed("dim", (c) => !(inFilter(c.t) || inFilter(c.p)));
     cellSel.select("rect").attr("width", cell - 1).attr("height", cell - 1)
       .transition("fill").duration(duration).attr("fill", fill);
+    // Every non-zero count is printed (single errors matter: with 50 images per class, 1 error = 2 %); zeros stay
+    // empty. Only when the cells are too small for text are the counts limited to the cells of ≥ 5 %.
+    const showCount = (c) => c.count > 0 && (cell >= MIN_TEXT_CELL || c.frac >= 0.05);
     cellSel.select("text").attr("x", (cell - 1) / 2).attr("y", (cell - 1) / 2)
+      .style("font-size", cell < SMALL_CELL ? "8px" : null)
       .attr("fill", (c) => (dark(c) ? "#fff" : INK))
-      .text((c) => (c.frac >= 0.05 ? c.count : ""));
+      .text((c) => (showCount(c) ? c.count : ""));
 
     function cellAt(t, p) {
       const live = statsAt(store.state, config.epochIndex(store.state.epoch)).counts;

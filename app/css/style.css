@@ -39,11 +39,12 @@ html, body {
 
 /* ---------------------------------------------------------------- layout (drafts/draft-v2.png) */
 
-/* Proportions of the draft: columns 24 / 50 / 26 %; center 66 % embeddings + 34 % images; right 63 % metrics +
-   37 % data point; left: brand, controls, architecture, learning curve. Nothing scrolls. */
+/* Columns 16 / 64 / 20 % (narrower side panels than the draft's 24 / 50 / 26, so the embeddings view dominates;
+   the minimums keep the controls and the confusion matrix usable at 1280 px); center 66 % embeddings + 34 % images;
+   right 63 % metrics + 37 % data point; left: brand, controls, architecture, learning curve. Nothing scrolls. */
 .layout {
   display: grid;
-  grid-template-columns: minmax(250px, 24fr) minmax(0, 50fr) minmax(280px, 26fr);
+  grid-template-columns: minmax(220px, 16fr) minmax(0, 64fr) minmax(260px, 20fr);
   grid-template-areas: "left center right";
   gap: var(--gap);
   height: 100vh;
@@ -163,8 +164,15 @@ html, body {
   transform: rotate(45deg);
   transition: transform 150ms;
 }
+/* Panels whose title also holds tools (image view): the title text toggles, the arrow sits at the far right. */
+.collapse-label { flex: none; }
+.collapse-label::after { display: none; }
+.collapse-arrow { flex: none; width: 16px; height: 16px; justify-content: center; }
+.collapse-arrow::after { margin: 0 0 3px; }
 .collapsible.collapsed { flex: none !important; }
 .collapsible.collapsed > .panel-body { display: none; }
+.collapsible.collapsed .panel-tools { display: none; }
+.collapsible.collapsed .collapse-arrow { margin-left: auto; }
 .collapsible.collapsed .collapse-btn::after { margin-bottom: 0; transform: rotate(-45deg); }
 .collapsible.collapsed > .panel-title { border-bottom: none; border-radius: var(--radius); }
 
@@ -287,10 +295,22 @@ select.control-input:disabled {
   grid-template-columns: repeat(5, auto);   /* ▶ | label | steps | All | speed */
   align-items: center;
   gap: 5px 8px;
-  padding: 6px 8px;
+  padding: 6px 8px 6px 20px;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  cursor: move;                  /* draggable like the legend (steppers.js); buttons keep their own cursor */
+  user-select: none;
+}
+.stepper-grip {                  /* dotted grip on the left edge */
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 6px;
+  height: 20px;
+  transform: translateY(-50%);
+  background-image: radial-gradient(circle, var(--faint) 1.1px, transparent 1.4px);
+  background-size: 3px 4px;
 }
 .stepper-row { display: contents; }
 .stepper-label {
@@ -357,6 +377,7 @@ select.control-input:disabled {
   cursor: pointer;
 }
 .seg button + button { border-left: 1px solid var(--border-strong); }
+.panel-tools .seg:not(.pager) button { padding: 0 7px; }   /* compact toggles in panel titles (narrow columns) */
 .seg button:hover:not(.active),
 .tool-btn:hover { background: var(--hover); }
 .seg button.active { background: var(--ink); color: #fff; }
@@ -389,10 +410,12 @@ select.control-input:disabled {
 /* path view (VIS_PLAN.md §4.3) */
 .trails path { fill: none; stroke-width: 1px; vector-effect: non-scaling-stroke; pointer-events: none; }
 .trail-end { pointer-events: none; }
-.traj-line { fill: none; stroke-width: 2.5px; vector-effect: non-scaling-stroke; pointer-events: none; }
+/* pinned / hovered trajectory: selection color (near-black) on a white halo; step glyphs as in the scatter */
+.traj-halo { fill: none; stroke: var(--panel); stroke-width: 5px; stroke-opacity: 0.85; vector-effect: non-scaling-stroke; pointer-events: none; }
+.traj-line { fill: none; stroke: var(--ink); stroke-width: 2px; vector-effect: non-scaling-stroke; pointer-events: none; }
 .traj-step { pointer-events: none; }
-.traj-step circle { fill: var(--panel); stroke-width: 1.5px; }
-.traj-step.current circle { fill: var(--ink); stroke: var(--ink); }
+.traj-step path { stroke: var(--ink); stroke-width: 1px; }
+.traj-step.current path { stroke-width: 2px; }
 .traj-step text {
   fill: var(--ink);
   font-size: 10px;
@@ -431,7 +454,7 @@ select.control-input:disabled {
   position: absolute;
   bottom: 8px;
   left: 8px;
-  min-width: 150px;
+  min-width: 118px;              /* width = the class rows; the key below wraps instead of widening it */
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -495,13 +518,16 @@ select.control-input:disabled {
 .legend-count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 .legend-key {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 7px;
   padding: 4px 8px 5px;
   border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: var(--fs-small);
+  line-height: 1.25;
+  contain: inline-size;          /* adds no width to the legend: the text wraps to the rows' width */
 }
+.legend-key svg { flex: none; margin-top: 1px; }
 .legend-key path { fill: var(--muted); }
 
 .chip {

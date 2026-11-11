@@ -67,6 +67,10 @@ Three columns, same structure as draft-v2. Additions to the draft are marked ★
 - The embeddings plot fills the panel; the data keep the **same scale on both axes** (a centered square above the
   steppers), so t-SNE distances are not distorted.
 - Collapsible panels (▾) as in the draft: Model Metrics and Data Point can be collapsed to give space.
+- **Review 2026-11-10 (user feedback):** side columns narrowed to **16 / 64 / 20 %** (min 220 px / 260 px) so the
+  embeddings view dominates (1208 px wide at 1920); the **Image view is collapsible too** (title or ▾ at the far right;
+  the embeddings view takes its height); the **steppers box is draggable** like the legend (grip on its left edge,
+  kept inside the plot); the legend is as narrow as its class rows, its "misclassified" key wraps.
 
 ---
 
@@ -137,8 +141,11 @@ interaction is automatically linked).
   near-black, the end is the pure class color (paper Figure 1: "layer 1 → layer 4" dark→light).
   Stroke 1 px, opacity 0.25 (0.6 when filtered-in, 0.04 when filtered-out).
 - End positions (last epoch / last layer) are drawn as small dots on top so clusters stay readable.
-- Hovered/pinned trail: drawn unbundled (true path), 2.5 px, opacity 1, with a dot + small label at every step
+- Hovered/pinned trail: drawn unbundled (true path), 2 px, opacity 1, with a glyph + small label at every step
   (`e0, e1, …` or `h1, h2, …`). This reproduces the paper's "outlier trajectory" annotation.
+  **Line = selection color** (near-black on a white halo, §4.1), not a class hue: a true-class line next to a
+  predicted-class glyph read as an unrelated color. **Step glyphs = the point's own glyph at that step** (circle /
+  triangle, filled by the Color-by mode), so in T1 the glyph turns from triangle to circle where the point is learned.
 
 ### 4.4 Typography
 - One sans-serif family (system UI stack). Panel titles 13 px uppercase gray, labels 12 px, metric badges 16 px
@@ -219,6 +226,7 @@ interaction is automatically linked).
   Figure 1 (A_p[1] … A_p[4]). Hover a thumbnail = preview its NH; click = go to that step. Current step framed in black.
   If the center column is too narrow for 11 thumbnails, they shrink to 48 px; below that, fall back to plain buttons. [S]
 - Keyboard: `Space` play/pause, `←/→` previous/next step, `A` toggle All, `Esc` clear pin/brush. [S]
+- The steppers box can be **dragged** anywhere inside the plot (grip / background / labels; buttons keep working).
 
 ### 5.6 Image view (center, bottom) — draft-v2
 - Grid of thumbnails (48 px, pixelated scaling, 4 px gap) from the current **image source**, in this priority:
@@ -236,7 +244,9 @@ interaction is automatically linked).
 - **Confusion matrix** [M]: 10×10 heatmap at the **current epoch**, computed on the shown sample.
   - Rows = true class, columns = predicted class; row and column headers show the class color chip + name
     (digits as-is, CIFAR names abbreviated to 4 letters, full name in tooltip).
-  - Cell color = row-normalized fraction (`interpolateBlues`), count printed in cells ≥ 5 % (white text on dark).
+  - Cell color = row-normalized fraction (`interpolateBlues`), **every non-zero count printed** (white text on
+    dark; zeros empty). With 50 images per class a single error is 2 %, so a ≥ 5 % threshold hid most errors.
+    Only cells under 12 px fall back to the ≥ 5 % rule.
   - ★ **Hide diagonal** checkbox: rescales colors to the off-diagonal cells so errors stand out. [S]
   - Hover cell → tooltip "true 3, predicted 5: 12 (12 %)" + highlights those points in the scatter.
     **Click** cell → `cellFilter` (scatter + image view); click again to clear. [M]

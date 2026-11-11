@@ -18,7 +18,33 @@ export function initSteppers(container, { store }) {
   let built = null;            // structure key of the rows currently in the DOM
   let timer = null;
   let advancing = false;       // true while the player itself changes the step
+  let dragged = false;         // once the user moves the box, it keeps its place (clamped to the plot)
   const root = d3.select(container);
+
+  // ------------------------------------------------------------------ dragging (like the legend)
+  // The box is dragged by its background, labels or grip; its buttons keep working.
+  root.call(d3.drag()
+    .filter((event) => !event.button && !event.target.closest("button"))
+    .on("start", () => tooltip.hide())
+    .on("drag", (event) => {
+      dragged = true;
+      root.classed("moved", true);   // scatter.js: the legend no longer avoids the default steppers corner
+      moveBy(event.dx, event.dy);
+    }));
+
+  /** Moves the box by (dx, dy), kept inside the plot area. */
+  function moveBy(dx = 0, dy = 0) {
+    const plot = container.parentNode.querySelector(".plot");
+    if (!plot) return;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(Math.max(lo, hi), v));
+    const left = clamp(container.offsetLeft + dx, plot.offsetLeft, plot.offsetLeft + plot.offsetWidth - container.offsetWidth);
+    const top = clamp(container.offsetTop + dy, plot.offsetTop, plot.offsetTop + plot.offsetHeight - container.offsetHeight);
+    root.style("left", `${left}px`).style("top", `${top}px`).style("right", "auto").style("bottom", "auto");
+  }
+  // Keep a moved box inside the plot when the panel or the box itself (other mode = other rows) changes size.
+  const keepInside = new ResizeObserver(() => { if (dragged) moveBy(); });
+  keepInside.observe(container.parentNode);
+  keepInside.observe(container);
 
   function isReady(state) {
     if (!view || state.layer === null || state.epoch === null) return false;
@@ -52,6 +78,7 @@ export function initSteppers(container, { store }) {
   function build(state, structure) {
     built = structure;
     root.selectAll("*").remove();
+    root.append("span").attr("class", "stepper-grip").attr("title", "Drag to move").attr("aria-hidden", "true");
     const active = dimOf(state.mode);
     for (const dim of ["layer", "epoch"]) {
       const isActive = dim === active;

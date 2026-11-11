@@ -3,15 +3,16 @@
 Usage:
     python package.py             # -> dist/visual-learning.zip
 
-Excluded: training outputs (raw/), datasets (data/), the paper PDF, UI drafts, virtual environments and caches.
+Includes the UI drafts (drafts/, the mockups behind VIS_PLAN.md).
+Excluded: training outputs (raw/), datasets (data/), the paper PDF, style references, virtual environments and caches.
 """
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "dist" / "visual-learning.zip"
-INCLUDE = ["app.py", "app", "pipeline", "notebooks", "README.md", "PLAN.md", "VIS_PLAN.md", "PRESENTATION.md",
-           "task-description.md", "requirements.txt", "package.py"]
+INCLUDE = ["app.py", "app", "pipeline", "notebooks", "drafts", "README.md", "PLAN.md", "VIS_PLAN.md",
+           "PRESENTATION.md", "task-description.md", "requirements.txt", "package.py"]
 SKIP_PARTS = {"__pycache__", ".ipynb_checkpoints", ".DS_Store"}
 
 
