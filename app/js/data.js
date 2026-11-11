@@ -162,6 +162,7 @@ export class Coords {
     const toFrame = (flat) => Float32Array.from(flat, (v) => v / raw.scale);
     this.t1 = Object.fromEntries(Object.entries(raw.t1).map(([layer, frames]) => [layer, frames.map(toFrame)]));
     this.t2 = raw.t2.map((frames) => frames.map(toFrame));
+    this.unified = Boolean(raw.unified);  // T1 and T2 share coordinates (grid method): switching views keeps points
   }
 
   /**

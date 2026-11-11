@@ -4,7 +4,8 @@
 import { infoIcon } from "./ui.js";
 
 const PROJECTIONS = [
-  { id: "aumap", name: "Aligned UMAP" }, { id: "umap", name: "UMAP" }, { id: "tsne", name: "t-SNE" },
+  { id: "grid", name: "Aligned UMAP grid" }, { id: "aumap", name: "Aligned UMAP" }, { id: "umap", name: "UMAP" },
+  { id: "tsne", name: "t-SNE" },
   { id: "tsne_proc", name: "t-SNE + Procrustes" }, { id: "pca", name: "PCA" }];
 const MODES = [{ id: "epoch", name: "epoch (T1)" }, { id: "layer", name: "layer (T2)" }];
 const COLOR_BY = [{ id: "class", name: "class" }, { id: "correctness", name: "correctness" },
@@ -15,7 +16,8 @@ export const SAMPLE = Object.freeze({ min: 100, max: 1000, step: 100 });
 const INFO = {
   projection: "t-SNE and UMAP keep neighbors together; PCA keeps global variance. Layers (T2): t-SNE and UMAP start "
     + "from the Input map; t-SNE + Procrustes also turns each layer onto the previous one; Aligned UMAP penalizes "
-    + "points that move between layers. Epochs (T1): one joint map of all epochs.",
+    + "points that move between layers. Epochs (T1): one joint map of all epochs. Aligned UMAP grid: one map for "
+    + "both views (aligned across epochs and layers), so switching T1 / T2 keeps every point in place.",
   mode: "T1 (epoch): one layer across the training epochs. T2 (layer): one epoch from the input to the output layer.",
   sampleSize: "Balanced sample of test images: the same points at every epoch and layer. "
     + "Growing it only adds points.",
@@ -49,7 +51,7 @@ export function initControls(container, { store, index }) {
     {
       key: "bundling", label: "Bundling", info: INFO.bundling, options: () => BUNDLING,
       disabled: (s) => !s.showAll || !index.model(s.dataset, s.model)?.trails.includes(s.projection),
-      disabledReason: "Path view with Aligned UMAP or t-SNE only",
+      disabledReason: "Path view with Aligned UMAP (grid), Aligned UMAP or t-SNE only",
     },
   ];
 

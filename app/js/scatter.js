@@ -297,9 +297,12 @@ export function initScatter(container, { store, data, tools, overlay }) {
   }
 
   // ------------------------------------------------------------------ rendering
-  const keyOf = (state) => `${state.dataset}/${state.model}/${state.projection}/${state.mode}`;
-  const PATH_KEYS = ["showAll", "bundling", "layer", "epoch", "sampleSize", "classFilter", "cellFilter", "brushed"];
-  const TRAJECTORY_KEYS = ["pinned", "hovered", "trajectory", "showAll", "layer", "epoch", "colorBy"];
+  // With a unified projection (T1 and T2 share coordinates) a mode change keeps the points in place: it is not a
+  // new map, only another animated dimension, so it must not trigger the fade-out / fade-in swap.
+  const unified = (state) => view?.projection === state.projection && view.coords.unified;
+  const keyOf = (state) => `${state.dataset}/${state.model}/${state.projection}${unified(state) ? "" : `/${state.mode}`}`;
+  const PATH_KEYS = ["showAll", "bundling", "layer", "epoch", "sampleSize", "classFilter", "cellFilter", "brushed", "mode"];
+  const TRAJECTORY_KEYS = ["pinned", "hovered", "trajectory", "showAll", "layer", "epoch", "colorBy", "mode"];
 
   function isReady(state) {
     if (!view || state.layer === null || state.epoch === null) return false;
@@ -328,7 +331,8 @@ export function initScatter(container, { store, data, tools, overlay }) {
     if (changed.has("pinned") || (changed.has("playing") && !state.playing)) clearComet();
   }
 
-  /** Dataset / model / projection / mode change: positions are not comparable, so fade out and back in (§6). */
+  /** Dataset / model / projection / mode change: positions are not comparable, so fade out and back in (§6).
+   *  (A mode change of a unified projection keeps keyOf, so it never gets here.) */
   function swap() {
     swapping = true;
     tooltip.hide();
@@ -466,7 +470,8 @@ export function initScatter(container, { store, data, tools, overlay }) {
     };
   }
 
-  const geometryKey = (state) => `${keyOf(state)}|${state.mode === "epoch" ? state.layer : state.epoch}|${width}x${height}`;
+  const geometryKey = (state) =>
+    `${keyOf(state)}|${state.mode}|${state.mode === "epoch" ? state.layer : state.epoch}|${width}x${height}`;
 
   /** Unbundled step positions (base px) of every observation along the active dimension (cached). */
   function geometryFor(state) {

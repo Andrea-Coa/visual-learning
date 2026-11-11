@@ -4,7 +4,7 @@
 export const DEFAULTS = Object.freeze({
   dataset: "mnist",        // mnist | svhn | cifar10
   model: "mlp",            // mlp | cnn
-  projection: "aumap",     // aumap | umap | tsne | tsne_proc | pca (aumap: steadiest layer animation, PLAN S.4)
+  projection: "grid",      // grid | aumap | umap | tsne | tsne_proc | pca (grid: one map for T1 and T2, PLAN S.4/S.5)
   mode: "epoch",           // "epoch" (T1, inter-epoch) | "layer" (T2, inter-layer)
   layer: null,             // layer id; null = last hidden layer of the loaded configuration
   epoch: null,             // snapshot epoch value (not index); null = last snapshot epoch
