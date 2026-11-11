@@ -51,9 +51,9 @@ export class DataStore {
     return this.memo(path, async () => new Coords(await this.fetchJson(path)));
   }
 
-  /** Bundled t-SNE trails of one view: mode "epoch" (T1, key = layer id) or "layer" (T2, key = epoch value). */
-  trails(dataset, model, mode, key) {
-    const path = `${dataset}/${model}/trails/${mode === "epoch" ? `t1_${key}` : `t2_e${key}`}.json`;
+  /** Bundled trails of one view of a projection method: mode "epoch" (T1, key = layer id) or "layer" (T2, key = epoch value). */
+  trails(dataset, model, method, mode, key) {
+    const path = `${dataset}/${model}/trails/${method}/${mode === "epoch" ? `t1_${key}` : `t2_e${key}`}.json`;
     return this.memo(path, async () => new Trails(await this.fetchJson(path)));
   }
 

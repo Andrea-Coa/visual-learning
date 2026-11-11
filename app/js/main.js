@@ -11,7 +11,7 @@ import { initScatter } from "./scatter.js";
 import { Store } from "./state.js";
 import { initSteppers } from "./steppers.js";
 
-const PROJECTION_NAMES = { tsne: "t-SNE", pca: "PCA" };
+const PROJECTION_NAMES = { aumap: "Aligned UMAP", umap: "UMAP", tsne: "t-SNE", tsne_proc: "t-SNE + Procrustes", pca: "PCA" };
 
 const data = new DataStore("data/");
 const store = new Store();

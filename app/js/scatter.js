@@ -483,14 +483,15 @@ export function initScatter(container, { store, data, tools, overlay }) {
   const bundledAvailable = (state) => view.index.model(view.dataset, view.model).trails.includes(view.projection)
     && (state.mode === "layer" || view.config.t1Layers.includes(state.layer));
 
-  /** Trails of a geometry at a strength: "none" = straight segments; else the bundled t-SNE file (loaded once). */
+  /** Trails of a geometry at a strength: "none" = straight segments; else the bundled file of the projection (loaded once). */
   async function trailsFor(state, geometry, strength) {
     if (geometry.trails.has(strength)) return geometry.trails.get(strength);
     let trails;
     if (strength === "none") {
       trails = new Map([...geometry.nodePaths].map(([id, p]) => [id, straightTrail(p, 4)]));
     } else {
-      const file = await data.trails(view.dataset, view.model, state.mode, state.mode === "epoch" ? state.layer : state.epoch);
+      const file = await data.trails(view.dataset, view.model, view.projection, state.mode,
+        state.mode === "epoch" ? state.layer : state.epoch);
       trails = new Map();
       for (let id = 0; id < view.config.n; id++) {
         const t = file.trail(strength, id);
