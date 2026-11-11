@@ -270,6 +270,8 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
   > 2 methods. Pending (user): Pages deploy (6.6) and Firefox / Safari by hand (not installed / not scriptable here).
 - [x] 8.4 Build the submission ZIP (`app/` = site + data files; exclude `.venv`, `raw/`).
   > note: `python package.py` → `dist/jamona.zip` (28 MB, git-ignored). Rebuild after any change.
+  > note: 2026-11-10: `drafts/` added to the ZIP (user request) → 159 files, 28.8 MB. Rebuilt from commit 7e395bd and
+  > tested from a clean extraction: `python app.py` serves every file type (200, correct MIME), full UI renders.
 - [x] 8.5 *(optional)* `app.py`: ~10-line Flask wrapper serving `app/` as static files, only if the course insists
       on a Flask app in the ZIP.
   > note: done (the assignment text asks for a Flask application). Tested: MIME types OK (`text/javascript` for modules).
@@ -307,4 +309,8 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 | 2026-11-10 | Claude | 7.3 done (`steppers.js`): filmstrip rows, Play/speed/All, keyboard, time axis; legend placed outside the plot when room. Steppers test (33 checks) + scatter regression (29) pass; screenshots at 1920 / 1300 px. Next: 7.4 path view. |
 | 2026-11-10 | Claude | Layout reorganized to match `drafts/draft-v2.png` and never scroll (user request): steppers as compact rows inside the plot (filmstrip dropped), legend bottom-left, plot fills the panel, paged image view, panels sized to their height, `<details>` → collapsible sections. 4 suites + no-scroll check at 1280×720 … 2560×1440 pass. |
 | 2026-11-10 | Claude | 7.4–7.9 done (path view, curve, architecture, metrics, images, data point, color-by, comet, chips; layout fixes). 8.1/8.2/8.4/8.5/8.6 done (README rationale + findings, `package.py`, `app.py`, `PRESENTATION.md`). Left for the user: 6.6 Pages setting + push, 8.3 Firefox check. |
+| 2026-11-10 | Claude | Submission ZIP rebuilt with `drafts/` (`package.py` INCLUDE); 159 files, 28.8 MB; tested from a clean extraction with the Flask wrapper + headless Edge. |
+| 2026-11-10 | Claude | UI review fixes: pinned trajectory in selection color + per-step glyphs; narrower legend (wrapping key); draggable steppers; collapsible image view; all non-zero confusion counts; side columns 16/64/20 %. Fixed two overflows this caused at 1280×720 (curve toggle, metrics headers now measured). Checked in headless Edge at 1280×720, 1366×768, 1920×1080, 2560×1440: no scroll, no clipped panel. |
+| 2026-11-10 | Claude | Left column widened 16 → 19 % (min 220 → 250 px), center 64 → 61 %: controls were too tight. No overflow at 1280×720 / 1920×1080. ZIP not rebuilt (user: change not for the submission). |
+| 2026-11-10 | Claude | Left column widened again 19 → 22 % (min 280 px), center 58 %. No overflow at 1280×720 / 1920×1080. ZIP not rebuilt. |
 | 2026-11-11 | Claude | Project renamed to **JaMoNA** (Jimena and Andrea's Model Network Analysis); slug `jamona` in URLs, Colab/Drive paths and the ZIP. New logo `app/img/jamona.svg` (piglet + magnifying glass) in the README, site header and favicon. GitHub repo rename is up to the owner. |

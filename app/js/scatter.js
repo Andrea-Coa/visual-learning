@@ -295,7 +295,7 @@ export function initScatter(container, { store, data, tools, overlay }) {
   // ------------------------------------------------------------------ rendering
   const keyOf = (state) => `${state.dataset}/${state.model}/${state.projection}/${state.mode}`;
   const PATH_KEYS = ["showAll", "bundling", "layer", "epoch", "sampleSize", "classFilter", "cellFilter", "brushed"];
-  const TRAJECTORY_KEYS = ["pinned", "hovered", "trajectory", "showAll", "layer", "epoch"];
+  const TRAJECTORY_KEYS = ["pinned", "hovered", "trajectory", "showAll", "layer", "epoch", "colorBy"];
 
   function isReady(state) {
     if (!view || state.layer === null || state.epoch === null) return false;
@@ -534,44 +534,57 @@ export function initScatter(container, { store, data, tools, overlay }) {
 
   /**
    * The unbundled trajectory (§4.3): pinned point (if "Show trajectory" is on) and, in the path view, the hovered
-   * one: a 2.5 px polyline with a dot + label at every step, the current step filled.
+   * one. The line is the selection color (near-black with a white halo, §4.1: selection is never a hue); every step
+   * carries the point's own glyph at that step (circle = correct, triangle = wrong, filled by the "Color by" mode),
+   * so in T1 the glyph changes at the epoch where the observation is learned. The current step is enlarged.
    */
   function renderTrajectory(state) {
     if (!isReady(state)) return;
+    const { config } = view;
     const shownIds = [];
     if (state.pinned !== null && state.trajectory) shownIds.push(state.pinned);
     if (state.showAll && state.hovered !== null && state.hovered !== state.pinned) shownIds.push(state.hovered);
     const geometry = shownIds.length ? geometryFor(state) : null;
     const { current } = shownIds.length ? stepFrames(state) : { current: -1 };
+    // Prediction at a step: T1 steps are epochs; in T2 every layer shares the current epoch's prediction.
+    const epochNow = config.epochIndex(state.epoch);
+    const predAt = (id, s) => config.preds[state.mode === "epoch" ? s : epochNow][id];
+    const lineOf = (id) => {
+      const p = geometry.nodePaths.get(id);
+      return d3.line()(d3.range(geometry.labels.length).map((s) => [p[2 * s], p[2 * s + 1]]));
+    };
 
     const traj = trajectoryG.selectAll(".traj").data(shownIds, (id) => id).join((enter) => {
       const g = enter.append("g").attr("class", "traj");
+      g.append("path").attr("class", "traj-halo");
       g.append("path").attr("class", "traj-line");
       return g;
     });
-    traj.select(".traj-line")
-      .attr("stroke", (id) => CLASS_COLORS[view.config.labels[id]])
-      .attr("d", (id) => d3.line()(d3.range(geometry.labels.length).map((s) => {
-        const p = geometry.nodePaths.get(id);
-        return [p[2 * s], p[2 * s + 1]];
-      })));
+    traj.select(".traj-halo").attr("d", lineOf);
+    traj.select(".traj-line").attr("d", lineOf);
     traj.selectAll(".traj-step")
       .data((id) => geometry.labels.map((label, s) => ({ id, s, label, p: geometry.nodePaths.get(id) })))
       .join((enter) => {
         const g = enter.append("g").attr("class", "traj-step");
         const glyph = g.append("g").attr("class", "glyph");
-        glyph.append("circle").attr("r", 3.5);
-        glyph.append("text").attr("x", 6).attr("y", -6);
+        glyph.append("path");
+        glyph.append("text").attr("x", 7).attr("y", -7);
         return g;
       })
       .attr("transform", (d) => `translate(${d.p[2 * d.s]},${d.p[2 * d.s + 1]})`)
       .classed("current", (d) => d.s === current)
       .call((g) => g.select(".glyph").attr("transform", glyphScale()))
-      .call((g) => g.select("circle").attr("stroke", (d) => CLASS_COLORS[view.config.labels[d.id]]))
+      .call((g) => g.select("path").each(function (d) {
+        const style = pointStyle(state.colorBy,
+          { label: config.labels[d.id], pred: predAt(d.id, d.s), learnedAt: config.learnedAt[d.id] }, config.epochs.length);
+        d3.select(this).attr("d", symbolPath(style.wrong, d.s === current ? EMPHASIS : 1.2))
+          .attr("fill", style.hollow ? "none" : style.fill);
+      }))
       .call((g) => g.select("text").text((d) => d.label));
     trajectoryG.raise();
   }
 
+  /** The pinned point's last positions during Play, in the selection color (like its trajectory). */
   function renderComet(moveMs) {
     cometG.selectAll(".comet-dot").data(comet).join((enter) => {
       const g = enter.append("g").attr("class", "comet-dot");
@@ -580,7 +593,7 @@ export function initScatter(container, { store, data, tools, overlay }) {
     })
       .attr("transform", (p) => `translate(${p[0]},${p[1]})`)
       .call((g) => g.select(".glyph").attr("transform", glyphScale()))
-      .style("fill", () => (store.state.pinned !== null ? CLASS_COLORS[view.config.labels[store.state.pinned]] : INK))
+      .style("fill", INK)
       .transition("comet").duration(moveMs)
       .style("opacity", (p, i) => COMET[i]);
   }
@@ -707,8 +720,10 @@ export function initScatter(container, { store, data, tools, overlay }) {
    * (e.g. a 720 px projector) it starts collapsed so it hides no points. */
   function placeLegend() {
     if (!legendToggled) setLegendCollapsed(height < LEGEND_MIN_PLOT);
-    // Bottom-left (draft-v2), unless the steppers reach that far left: then top-left.
-    const room = overlay ? overlay.getBoundingClientRect().left - container.getBoundingClientRect().left : width;
+    // Bottom-left (draft-v2), unless the steppers (in their default bottom-right corner) reach that far left: then
+    // top-left. Once the user has moved the steppers, their position says nothing about the free corners.
+    const avoidSteppers = overlay && !overlay.classList.contains("moved");
+    const room = avoidSteppers ? overlay.getBoundingClientRect().left - container.getBoundingClientRect().left : width;
     const fitsBottom = room >= legend.node().offsetWidth + 2 * LEGEND_MARGIN;
     legend.style("left", `${LEGEND_MARGIN}px`)
       .style("top", fitsBottom ? "auto" : `${LEGEND_MARGIN}px`)
