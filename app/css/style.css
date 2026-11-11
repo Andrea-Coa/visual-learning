@@ -39,12 +39,12 @@ html, body {
 
 /* ---------------------------------------------------------------- layout (drafts/draft-v2.png) */
 
-/* Columns 19 / 61 / 20 % (narrower side panels than the draft's 24 / 50 / 26, so the embeddings view dominates;
+/* Columns 22 / 58 / 20 % (narrower side panels than the draft's 24 / 50 / 26, so the embeddings view dominates;
    the minimums keep the controls and the confusion matrix usable at 1280 px); center 66 % embeddings + 34 % images;
    right 63 % metrics + 37 % data point; left: brand, controls, architecture, learning curve. Nothing scrolls. */
 .layout {
   display: grid;
-  grid-template-columns: minmax(250px, 19fr) minmax(0, 61fr) minmax(260px, 20fr);
+  grid-template-columns: minmax(280px, 22fr) minmax(0, 58fr) minmax(260px, 20fr);
   grid-template-areas: "left center right";
   gap: var(--gap);
   height: 100vh;

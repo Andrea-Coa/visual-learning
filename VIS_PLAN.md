@@ -67,8 +67,8 @@ Three columns, same structure as draft-v2. Additions to the draft are marked ★
 - The embeddings plot fills the panel; the data keep the **same scale on both axes** (a centered square above the
   steppers), so t-SNE distances are not distorted.
 - Collapsible panels (▾) as in the draft: Model Metrics and Data Point can be collapsed to give space.
-- **Review 2026-11-10 (user feedback):** side columns narrowed to **19 / 61 / 20 %** (min 250 px / 260 px) so the
-  embeddings view dominates (1152 px wide at 1920; 16 % for the left column was too tight for the controls); the **Image view is collapsible too** (title or ▾ at the far right;
+- **Review 2026-11-10 (user feedback):** side columns narrowed to **22 / 58 / 20 %** (min 280 px / 260 px) so the
+  embeddings view dominates (1095 px wide at 1920; 16 % and 19 % for the left column were too tight for the controls); the **Image view is collapsible too** (title or ▾ at the far right;
   the embeddings view takes its height); the **steppers box is draggable** like the legend (grip on its left edge,
   kept inside the plot); the legend is as narrow as its class rows, its "misclassified" key wraps.
 
