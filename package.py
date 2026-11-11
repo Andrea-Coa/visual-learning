@@ -1,7 +1,7 @@
 """Builds the Canvas submission ZIP (PLAN 8.4): Flask app + static site + data files (nodes and edges) + code + docs.
 
 Usage:
-    python package.py             # -> dist/visual-learning.zip
+    python package.py             # -> dist/jamona.zip
 
 Excluded: training outputs (raw/), datasets (data/), the paper PDF, UI drafts, virtual environments and caches.
 """
@@ -9,7 +9,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-OUT = ROOT / "dist" / "visual-learning.zip"
+OUT = ROOT / "dist" / "jamona.zip"
 INCLUDE = ["app.py", "app", "pipeline", "notebooks", "README.md", "PLAN.md", "VIS_PLAN.md", "PRESENTATION.md",
            "task-description.md", "requirements.txt", "package.py"]
 SKIP_PARTS = {"__pycache__", ".ipynb_checkpoints", ".DS_Store"}
@@ -29,7 +29,7 @@ def main() -> None:
     count = 0
     with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in files():
-            zf.write(path, Path("visual-learning") / path.relative_to(ROOT))
+            zf.write(path, Path("jamona") / path.relative_to(ROOT))
             count += 1
     print(f"{OUT.relative_to(ROOT)}: {count} files, {OUT.stat().st_size / 1e6:.1f} MB")
 

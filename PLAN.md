@@ -1,4 +1,4 @@
-# Visual Learning — Implementation Plan
+# JaMoNA — Implementation Plan
 
 High-level plan for the DS5343 "Visual Learning Models" assignment (see `task-description.md`),
 based on Rauber et al., *Visualizing the Hidden Activity of Artificial Neural Networks* (`paper/`).
@@ -39,7 +39,7 @@ Note: the assignment's T1/T2 are *not* the paper's T1/T2. Here **T1 = inter-epoc
 ## Proposed layout
 
 ```
-visual-learning/
+jamona/
 ├── PLAN.md, CLAUDE.md, README.md, requirements.txt
 ├── pipeline/                  # Python: training + processing (runs on Colab or locally)
 │   ├── config.py              # datasets, models, epochs to snapshot, seeds, paths
@@ -70,7 +70,7 @@ visual-learning/
   > note: installed in `.venv` (Python 3.13, torch 2.15 CPU, openTSNE 1.0.4) without issues.
 - [x] 0.3 Colab notebook skeleton that installs deps, mounts Drive, and runs `pipeline/train.py`.
   > note: `notebooks/colab_train.ipynb`; no installs needed (Colab ships torch/torchvision/scipy). Not yet run on Colab.
-  > The notebook clones/pulls the GitHub repo (code) and writes outputs to Drive `MyDrive/visual-learning/raw/`. Push code changes before training.
+  > The notebook clones/pulls the GitHub repo (code) and writes outputs to Drive `MyDrive/jamona/raw/`. Push code changes before training.
 
 ## Phase 1 — Data & models
 
@@ -183,7 +183,7 @@ visual-learning/
   > note: documented in README "Run the site". `main.js` = entry point (loads the selected config, generated title,
   > loading/error states); `window.app` exposes `{data, store, current}` for the console.
 - [~] 6.6 GitHub Pages: `.github/workflows/pages.yml` uploads `app/` (repo setting: Pages → Source: GitHub Actions).
-  > note: Pages serves the site under `/visual-learning/`, so every URL in the code must be relative.
+  > note: Pages serves the site under `/jamona/`, so every URL in the code must be relative.
   > note: workflow written (triggers on pushes to `main` touching `app/`, or manually). Not run yet: needs the one-time
   > repo setting + a push by the user.
 
@@ -269,7 +269,7 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
   > note: done: local http.server + Flask wrapper (also from the extracted ZIP), Chrome headless, all 6 configs ×
   > 2 methods. Pending (user): Pages deploy (6.6) and Firefox / Safari by hand (not installed / not scriptable here).
 - [x] 8.4 Build the submission ZIP (`app/` = site + data files; exclude `.venv`, `raw/`).
-  > note: `python package.py` → `dist/visual-learning.zip` (28 MB, git-ignored). Rebuild after any change.
+  > note: `python package.py` → `dist/jamona.zip` (28 MB, git-ignored). Rebuild after any change.
 - [x] 8.5 *(optional)* `app.py`: ~10-line Flask wrapper serving `app/` as static files, only if the course insists
       on a Flask app in the ZIP.
   > note: done (the assignment text asks for a Flask application). Tested: MIME types OK (`text/javascript` for modules).
@@ -307,3 +307,4 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 | 2026-11-10 | Claude | 7.3 done (`steppers.js`): filmstrip rows, Play/speed/All, keyboard, time axis; legend placed outside the plot when room. Steppers test (33 checks) + scatter regression (29) pass; screenshots at 1920 / 1300 px. Next: 7.4 path view. |
 | 2026-11-10 | Claude | Layout reorganized to match `drafts/draft-v2.png` and never scroll (user request): steppers as compact rows inside the plot (filmstrip dropped), legend bottom-left, plot fills the panel, paged image view, panels sized to their height, `<details>` → collapsible sections. 4 suites + no-scroll check at 1280×720 … 2560×1440 pass. |
 | 2026-11-10 | Claude | 7.4–7.9 done (path view, curve, architecture, metrics, images, data point, color-by, comet, chips; layout fixes). 8.1/8.2/8.4/8.5/8.6 done (README rationale + findings, `package.py`, `app.py`, `PRESENTATION.md`). Left for the user: 6.6 Pages setting + push, 8.3 Firefox check. |
+| 2026-11-11 | Claude | Project renamed to **JaMoNA** (Jimena and Andrea's Model Network Analysis); slug `jamona` in URLs, Colab/Drive paths and the ZIP. New logo `app/img/jamona.svg` (piglet + magnifying glass) in the README, site header and favicon. GitHub repo rename is up to the owner. |

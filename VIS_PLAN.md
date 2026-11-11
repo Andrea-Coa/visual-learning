@@ -1,4 +1,4 @@
-# Visual Learning — Visualization Design Plan
+# JaMoNA — Visualization Design Plan
 
 Design specification of the D3 front end (Phase 6–7 of `PLAN.md`). It turns the mockup
 [`drafts/draft-v2.png`](drafts/draft-v2.png) plus the review feedback into a complete spec.
@@ -35,7 +35,7 @@ Three columns, same structure as draft-v2. Additions to the draft are marked ★
 
 ```
 ┌───────────────────┬──────────────────────────────────────────────────┬─────────────────────┐
-│ ◯ Visual Learning │ EMBEDDINGS VIEW                     [Pan|Brush] ⟲│ MODEL METRICS     ▾ │
+│ 🐷 JaMoNA         │ EMBEDDINGS VIEW                     [Pan|Brush] ⟲│ MODEL METRICS     ▾ │
 │───────────────────│ ┌──────────────────────────────────────────────┐ │ Confusion matrix    │
 │ Dataset   [MNIST▾]│ │                                  ★NH 0.94    │ │ (at current epoch)  │
 │ Dim. red. [t-SNE▾]│ │      scatterplot  ⇄  trail (path) view       │ │ [ ] hide diagonal   │

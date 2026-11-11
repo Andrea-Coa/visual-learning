@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="JaMoNA logo: a pink piglet holding a magnifying glass">
+<title>JaMoNA</title>
+<defs><filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2"/></filter><radialGradient id="skin" cx="45%" cy="40%" r="65%"><stop offset="0" stop-color="#fde3e6"/><stop offset="1" stop-color="#f7c3ca"/></radialGradient></defs>
+<path d="M28 96c-6 1-9-3-7-6s6 0 3 3" fill="none" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M40 38C33 30 30 21 33 16c7-1 16 5 20 13z" fill="url(#skin)" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M33 16c-2 5 0 10 6 10" fill="none" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M88 38c7-8 10-17 7-22-7-1-16 5-20 13z" fill="url(#skin)" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M95 16c2 5 0 10-6 10" fill="none" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M64 26C42 26 31 41 31 58c0 9-4 17-4 29 0 17 17 25 37 25s37-8 37-25c0-12-4-20-4-29 0-17-11-32-33-32z" fill="url(#skin)" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M44 108c-1 6 3 8 8 8s8-2 7-7" fill="#f7c3ca" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M69 109c-1 5 2 7 7 7s9-2 8-8" fill="#f7c3ca" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="43" cy="68" rx="7.5" ry="4.5" fill="#f497a6" opacity=".7" filter="url(#soft)"/><ellipse cx="85" cy="68" rx="7.5" ry="4.5" fill="#f497a6" opacity=".7" filter="url(#soft)"/>
+<ellipse cx="64" cy="66" rx="9" ry="6.2" fill="#f5adb8" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="60.5" cy="66" rx="1.5" ry="2.3" fill="#9a6359"/><ellipse cx="67.5" cy="66" rx="1.5" ry="2.3" fill="#9a6359"/>
+<circle cx="51" cy="57" r="2.6" fill="#4a2e2a"/><circle cx="77" cy="57" r="2.6" fill="#4a2e2a"/>
+<path d="M40 82c-4 4-3 9 2 10" fill="none" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M101 80 91 96" stroke="#9a6359" stroke-width="6" stroke-linecap="round"/><path d="M101 80 91 96" stroke="#d39a6a" stroke-width="3" stroke-linecap="round"/>
+<circle cx="107" cy="70" r="12" fill="#e3f3fb" fill-opacity=".85" stroke="#9a6359" stroke-width="2.6"/>
+<path d="M86 88c5-1 9 2 9 6s-5 5-8 3" fill="url(#skin)" stroke="#9a6359" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

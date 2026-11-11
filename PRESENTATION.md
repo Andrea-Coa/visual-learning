@@ -4,7 +4,7 @@ About 8 minutes: 1 min context, 6 min live demo, 1 min takeaways. Numbers come f
 
 ## Before class
 
-- Open the live site (<https://andrea-coa.github.io/visual-learning/>) **and** a local copy as a backup:
+- Open the live site (<https://andrea-coa.github.io/jamona/>) **and** a local copy as a backup:
   `python -m http.server 8000 -d app` (or `python app.py`). D3 is vendored, so the local copy works offline.
 - Browser at 1920×1080 (or full screen), zoom 100 %. Load each dataset once so its files are cached.
 - Start state: MNIST · MLP · t-SNE · View by epoch · sample 500.
