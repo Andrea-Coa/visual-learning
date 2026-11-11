@@ -5,12 +5,14 @@ import { confusionMatrix, perClassScores } from "./metrics.js";
 import { infoIcon, tooltip } from "./ui.js";
 
 const LAYER_NOTE = "Predictions come from the output layer, so this panel does not depend on the selected layer.";
-const MATRIX_INFO = "Rows: true class · columns: predicted class. Color: share of the row (row-normalized). "
+const MATRIX_INFO = "Rows: true class · columns: predicted class, at the current epoch, on the shown sample. "
+  + "Color: share of the row (row-normalized). "
   + "Click a cell to filter its points; hide the diagonal to make the errors stand out.";
 const METRICS = [{ id: "recall", name: "Recall (class accuracy)" }, { id: "precision", name: "Precision" },
   { id: "f1", name: "F1" }];
 const M = { left: 40, top: 30 };                         // matrix header sizes
-const BARS = { top: 8, bottom: 26, left: 28, right: 4, min: 90, max: 160 };  // height = 30 % of the panel
+const BARS = { top: 8, bottom: 26, left: 28, right: 4, min: 90, max: 130 };  // height = 30 % of the panel
+const MAX_SHARE = 0.55;     // the panel is sized to its content, using at most this share of the column height
 const HEAD_MARGINS = 26;    // px of vertical margin around the two panel-internal headers (CSS .mm-head)
 const MIN_TEXT_CELL = 12;   // px: below this cell size only the cells of ≥ 5 % show their count
 const SMALL_CELL = 16;      // px: below this cell size the counts use a smaller font
@@ -26,7 +28,6 @@ export function initModelMetrics(container, { store }) {
   // Confusion matrix
   const head = root.append("div").attr("class", "mm-head");
   head.append("span").attr("class", "mm-title").text("Confusion matrix");
-  const epochLabel = head.append("span").attr("class", "mm-sub");
   const layerNote = head.append("span").attr("class", "mm-note");
   layerNote.node().append(infoIcon(LAYER_NOTE));
   head.node().append(infoIcon(MATRIX_INFO));
@@ -63,6 +64,25 @@ export function initModelMetrics(container, { store }) {
   const isReady = (state) => view && view.dataset === state.dataset && view.model === state.model
     && state.epoch !== null;
 
+  const panel = container.closest(".panel");
+  const column = panel.parentElement;
+
+  /**
+   * Body height the matrix + bars may use. The panel is sized to its content (CSS: flex none) so the data-point
+   * panel below gets the rest of the column; the content may take at most MAX_SHARE of the column height, or all
+   * the room the other panels leave when they are collapsed. Derived from the column, not from the panel itself
+   * (whose height follows from this result).
+   */
+  function availableBodyHeight() {
+    const others = [...column.children].filter((p) => p !== panel);
+    const gap = parseFloat(getComputedStyle(column).rowGap) || 0;
+    const maxPanel = others.every((p) => p.classList.contains("collapsed"))
+      ? column.clientHeight - d3.sum(others, (p) => p.offsetHeight + gap)
+      : Math.round(column.clientHeight * MAX_SHARE);
+    const chrome = panel.querySelector(".panel-title").offsetHeight + 2 + 16;   // borders + body padding
+    return maxPanel - chrome;
+  }
+
   /** Confusion counts and scores at an epoch index, on the shown sample. */
   function statsAt(state, e) {
     const { config } = view;
@@ -73,7 +93,7 @@ export function initModelMetrics(container, { store }) {
   function render(state, changed = new Set()) {
     if (!isReady(state)) return;
     width = container.clientWidth - 20;
-    const bodyHeight = container.clientHeight - 16;
+    const bodyHeight = availableBodyHeight();
     if (width <= 0 || bodyHeight <= 0) return;
     // No scrolling (draft-v2): the matrix and the bars share the panel height. The headers are measured: in a
     // narrow panel they wrap onto two lines.
@@ -87,7 +107,6 @@ export function initModelMetrics(container, { store }) {
     const duration = changed.has("epoch") ? ms(MOVE_MS) / (state.playing ? state.speed : 1) : 0;
     const names = config.classes;
 
-    epochLabel.text(state.epoch === 0 ? "epoch 0 (untrained)" : `epoch ${state.epoch}`);
     layerNote.style("display", state.mode === "layer" ? null : "none");
     metricSelect.property("value", state.metric);
 
@@ -221,7 +240,10 @@ export function initModelMetrics(container, { store }) {
       .text((c) => shortName(names[c]));
   }
 
-  new ResizeObserver(() => render(store.state)).observe(container);
+  // The column (window size) and its panels (collapsing the data point frees room); rendering itself changes the
+  // panel height, which re-renders once with the same result.
+  const resize = new ResizeObserver(() => render(store.state));
+  for (const el of [container, column, ...column.children]) resize.observe(el);
   store.subscribe(render, ["epoch", "sampleSize", "classFilter", "cellFilter", "hovered", "pinned", "mode", "metric"]);
 
   return {

@@ -1,5 +1,11 @@
 # Deploys the static site in app/ to GitHub Pages.
 # One-time setup in the repository: Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+#
+# Two jobs (GitHub's official layout): `build` uploads app/ as the "github-pages" artifact, `deploy` publishes it.
+# If only the deploy fails (e.g. a transient GitHub API error), use "Re-run failed jobs": it re-runs `deploy` alone
+# and reuses the uploaded artifact. Re-running the whole run would upload a second artifact with the same name,
+# which deploy-pages rejects ("Multiple artifacts named github-pages"); in that case start a new run instead
+# (Actions -> this workflow -> Run workflow).
 name: Deploy site to GitHub Pages
 
 on:
@@ -13,21 +19,27 @@ permissions:
   pages: write
   id-token: write
 
+# One deployment at a time; a newer push queues instead of cancelling a deployment halfway.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4

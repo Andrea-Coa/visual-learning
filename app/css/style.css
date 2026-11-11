@@ -39,12 +39,14 @@ html, body {
 
 /* ---------------------------------------------------------------- layout (drafts/draft-v2.png) */
 
-/* Columns 22 / 58 / 20 % (narrower side panels than the draft's 24 / 50 / 26, so the embeddings view dominates;
-   the minimums keep the controls and the confusion matrix usable at 1280 px); center 66 % embeddings + 34 % images;
-   right 63 % metrics + 37 % data point; left: brand, controls, architecture, learning curve. Nothing scrolls. */
+/* Columns 21 / 58 / 21 % (equal side panels, narrower than the draft's 24 / 50 / 26, so the embeddings view
+   dominates; the minimums keep the controls and the confusion matrix usable at 1280 px); center 66 % embeddings +
+   34 % images; right: model metrics sized to its content (≤ 55 %, model-metrics.js) + data point taking the
+   rest; left: brand, controls, architecture, learning curve.
+   Nothing scrolls. */
 .layout {
   display: grid;
-  grid-template-columns: minmax(280px, 22fr) minmax(0, 58fr) minmax(260px, 20fr);
+  grid-template-columns: minmax(280px, 21fr) minmax(0, 58fr) minmax(280px, 21fr);
   grid-template-areas: "left center right";
   gap: var(--gap);
   height: 100vh;
@@ -67,8 +69,8 @@ html, body {
 #curve-panel         { flex: 153 1 0; }
 #embeddings-panel    { flex: 66 1 0; }
 #images-panel        { flex: 34 1 0; }
-#metrics-panel       { flex: 63 1 0; }
-#datapoint-panel     { flex: 37 1 0; }
+#metrics-panel       { flex: none; }      /* height = its content (matrix + bars) */
+#datapoint-panel     { flex: 1 1 0; }     /* takes the rest of the column */
 
 /* ---------------------------------------------------------------- brand */
 
@@ -429,10 +431,13 @@ select.control-input:disabled {
 }
 .comet-dot { pointer-events: none; }
 
-.brush-rect {
+.lasso {                         /* freeform brush */
   fill: rgba(34, 34, 34, 0.06);
+  fill-rule: evenodd;            /* same rule as d3.polygonContains for self-crossing shapes */
   stroke: var(--ink);
+  stroke-width: 1px;
   stroke-dasharray: 4 3;
+  stroke-linejoin: round;
   pointer-events: none;
 }
 
@@ -721,7 +726,6 @@ select.control-input:disabled {
 }
 .mm-head + svg + .mm-head { margin-top: 12px; }
 .mm-title { font-weight: 600; }
-.mm-sub { color: var(--muted); }
 .mm-note { display: inline-flex; }
 .mm-check { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: var(--muted); cursor: pointer; }
 .mm-check input { margin: 0; }

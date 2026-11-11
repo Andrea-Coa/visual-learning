@@ -323,7 +323,7 @@ All JSON is compact. **Coordinates** are integers `0..9999` in the unit square, 
 |---|---|
 | **T1 (epochs)** | *View by: epoch (T1)*. Pick a layer in the Layer row, press ▶ (or Space) on the Epoch row: points move from the untrained network (epoch 0) to epoch 50. `All` shows every epoch at once as bundled trails. |
 | **T2 (layers)** | *View by: layer (T2)*, or click a box in the Architecture panel. ▶ plays Input → hidden layers → Output; the separation bars show the NH of every layer at the current epoch. |
-| Filter | Legend or per-class bar (click = isolate, Shift + click = add, double-click = all), confusion-matrix cell, brush (`Brush` or Shift + drag). Filters combine; chips above the images clear them. |
+| Filter | Legend or per-class bar (click = isolate, Shift + click = add, double-click = all), confusion-matrix cell, freeform brush (`Brush` or Shift + drag: draw a shape around the points). Filters combine; chips above the images clear them. |
 | Details | Hover a point / trail / thumbnail (tooltip with the image); click to pin it: Data point panel, trajectory over all steps. |
 | Keyboard | Space play / pause · ← → previous / next step · A path view · Esc unpin, then clear the brush |
 
