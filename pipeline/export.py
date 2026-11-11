@@ -10,8 +10,8 @@ Layout (compact JSON; coordinates are integers 0..SCALE in the unit square, x ri
     <dataset>/<model>/meta.json               classes, architecture, snapshot epochs, learning curves, metrics
     <dataset>/<model>/nodes.json              labels, test indices, sample order, per-epoch predictions/probabilities
     <dataset>/<model>/coords_<method>.json    all T1 frames (per layer, per epoch) and T2 frames (per epoch, per layer)
-    <dataset>/<model>/trails/t1_<layer>.json  bundled t-SNE trails over epochs, per strength
-    <dataset>/<model>/trails/t2_e<epoch>.json bundled t-SNE trails over layers, per strength
+    <dataset>/<model>/trails/<method>/t1_<layer>.json   bundled trails over epochs, per strength
+    <dataset>/<model>/trails/<method>/t2_e<epoch>.json  bundled trails over layers, per strength
 The full schema is documented in README.md ("Site data files").
 """
 import argparse
@@ -27,7 +27,7 @@ from . import config
 SCALE = 9999          # coordinate quantization (same as pipeline.bundle)
 PROB_SCALE = 1000     # probabilities are stored as integers in per mille
 SPRITE_COLUMNS = 40   # 1000 images -> 40 x 25 grid
-METHODS = ("tsne", "pca")
+METHODS = ("tsne", "pca", "umap", "aumap", "tsne_proc")  # exported when raw/ has proj_<method>.npz
 DISPLAY_NAMES = {"mnist": "MNIST", "svhn": "SVHN", "cifar10": "CIFAR-10", "mlp": "MLP", "cnn": "CNN"}
 
 # Layer descriptions for the architecture panel. Must match pipeline/models.py.
@@ -154,8 +154,8 @@ def export_coords(proj: np.lib.npyio.NpzFile) -> dict:
     }
 
 
-def export_trails(cfg_dir: Path, out_dir: Path) -> int:
-    trails = np.load(cfg_dir / "trails_tsne.npz")
+def export_trails(cfg_dir: Path, out_dir: Path, method: str) -> int:
+    trails = np.load(cfg_dir / f"trails_{method}.npz")
     strengths = [str(s) for s in trails["strengths"]]
     common = {"scale": int(trails["scale"]), "samplesPerSegment": int(trails["samples_per_segment"]),
               "strengths": strengths}
@@ -168,9 +168,9 @@ def export_trails(cfg_dir: Path, out_dir: Path) -> int:
 
     size = 0
     for layer, views in zip(trails["t1_layers"], trails["t1"]):
-        size += write_json(out_dir / "trails" / f"t1_{layer}.json", payload(views))
+        size += write_json(out_dir / "trails" / method / f"t1_{layer}.json", payload(views))
     for epoch, views in zip(trails["epochs"], trails["t2"]):
-        size += write_json(out_dir / "trails" / f"t2_e{int(epoch)}.json", payload(views))
+        size += write_json(out_dir / "trails" / method / f"t2_e{int(epoch)}.json", payload(views))
     return size
 
 
@@ -185,12 +185,11 @@ def export_config(raw: Path, out: Path, dataset: str, model: str) -> dict:
     size += write_json(out_dir / "nodes.json", export_nodes(raw, cfg_dir, dataset, meta["epochs"]))
     for method in methods:
         size += write_json(out_dir / f"coords_{method}.json", export_coords(np.load(cfg_dir / f"proj_{method}.npz")))
-    has_trails = (cfg_dir / "trails_tsne.npz").exists()
-    if has_trails:
-        size += export_trails(cfg_dir, out_dir)
-    print(f"[{dataset}/{model}] {size / 1e6:.1f} MB ({', '.join(methods)}{', trails' if has_trails else ''})")
-    return {"id": model, "name": DISPLAY_NAMES[model], "methods": methods,
-            "trails": ["tsne"] if has_trails else []}
+    bundled = [m for m in methods if (cfg_dir / f"trails_{m}.npz").exists()]
+    for method in bundled:
+        size += export_trails(cfg_dir, out_dir, method)
+    print(f"[{dataset}/{model}] {size / 1e6:.1f} MB ({', '.join(methods)}; trails: {', '.join(bundled) or 'none'})")
+    return {"id": model, "name": DISPLAY_NAMES[model], "methods": methods, "trails": bundled}
 
 
 # --------------------------------------------------------------------------- entry point

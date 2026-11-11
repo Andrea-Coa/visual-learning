@@ -9,6 +9,7 @@ scipy>=1.11          # torchvision needs it to read the SVHN .mat files
 # Projections and trail bundling (phase 3-5)
 scikit-learn>=1.4
 openTSNE>=1.0
+umap-learn>=0.5      # UMAP and Aligned UMAP (PLAN S.4)
 pillow>=10.0
 
 # Optional wrapper (phase 8)

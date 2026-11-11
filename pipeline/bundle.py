@@ -1,4 +1,4 @@
-"""Trail bundling of the t-SNE projections (paper Sec. 5.4, "trail bundling").
+"""Trail bundling of the 2D projections (paper Sec. 5.4, "trail bundling"): t-SNE by default, any method on request.
 
 A trail joins the 2D positions of one observation over the steps of a view:
     T1: over the snapshot epochs (one set of 1000 trails per layer)
@@ -20,10 +20,11 @@ Two strengths are stored, "medium" and "strong" (more iterations). Unbundled tra
 directly from the projected points, and PCA trails are never bundled (see PLAN.md, key decisions).
 
 Usage:
-    python -m pipeline.bundle                       # all configurations
+    python -m pipeline.bundle                       # all configurations, t-SNE
     python -m pipeline.bundle --dataset svhn --model mlp --force
+    python -m pipeline.bundle --method aumap        # trails of another projection (proj_aumap.npz)
 
-Output: raw/<dataset>/<model>/trails_tsne.npz with
+Output: raw/<dataset>/<model>/trails_<method>.npz with
     t1   uint16 [len(t1_layers), len(strengths), N, (n_epochs - 1) * SAMPLES_PER_SEGMENT + 1, 2]
     t2   uint16 [len(epochs),    len(strengths), N, (n_layers - 1) * SAMPLES_PER_SEGMENT + 1, 2]
     strengths, epochs, t1_layers, t2_layers, samples_per_segment, scale
@@ -108,8 +109,8 @@ def quantize(points: np.ndarray) -> np.ndarray:
     return np.rint(points * SCALE).astype(np.uint16)
 
 
-def bundle_config(cfg_dir: Path) -> Path:
-    proj = np.load(cfg_dir / "proj_tsne.npz")
+def bundle_config(cfg_dir: Path, method: str = "tsne") -> Path:
+    proj = np.load(cfg_dir / f"proj_{method}.npz")
     labels, strengths = proj["labels"], list(STRENGTHS)
     # T1: proj["t1"] is [layer, epoch, obs, 2] -> trails over epochs, per layer.
     t1 = np.stack([np.stack([quantize(b[s]) for s in strengths])
@@ -117,7 +118,7 @@ def bundle_config(cfg_dir: Path) -> Path:
     # T2: proj["t2"] is [epoch, layer, obs, 2] -> trails over layers, per epoch.
     t2 = np.stack([np.stack([quantize(b[s]) for s in strengths])
                    for b in (bundle(epoch.transpose(1, 0, 2), labels) for epoch in proj["t2"])])
-    out = cfg_dir / "trails_tsne.npz"
+    out = cfg_dir / f"trails_{method}.npz"
     np.savez_compressed(out, t1=t1, t2=t2, strengths=np.array(strengths), epochs=proj["epochs"],
                         t1_layers=proj["t1_layers"], t2_layers=proj["t2_layers"],
                         samples_per_segment=SAMPLES_PER_SEGMENT, scale=SCALE)
@@ -129,6 +130,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dataset", nargs="+", choices=list(config.DATASETS), default=list(config.DATASETS))
     p.add_argument("--model", nargs="+", choices=list(config.TRAINING), default=list(config.TRAINING))
     p.add_argument("--raw", type=Path, default=config.DEFAULT_RAW_DIR, help="training outputs folder")
+    p.add_argument("--method", nargs="+", default=["tsne"], help="projections to bundle (proj_<method>.npz)")
     p.add_argument("--force", action="store_true", help="recompute existing trails")
     return p.parse_args()
 
@@ -137,17 +139,18 @@ def main() -> None:
     args = parse_args()
     for dataset in args.dataset:
         for model in args.model:
-            cfg_dir = args.raw / dataset / model
-            if (cfg_dir / "trails_tsne.npz").exists() and not args.force:
-                print(f"[{dataset}/{model}] trails exist, skipping (use --force to recompute).")
-                continue
-            if not (cfg_dir / "proj_tsne.npz").exists():
-                print(f"[{dataset}/{model}] no proj_tsne.npz, run `python -m pipeline.project` first.")
-                continue
-            start = time.perf_counter()
-            out = bundle_config(cfg_dir)
-            print(f"[{dataset}/{model}] {out.name} ({out.stat().st_size / 1e6:.1f} MB, "
-                  f"{time.perf_counter() - start:.0f}s)", flush=True)
+            for method in args.method:
+                cfg_dir = args.raw / dataset / model
+                if (cfg_dir / f"trails_{method}.npz").exists() and not args.force:
+                    print(f"[{dataset}/{model}] {method} trails exist, skipping (use --force to recompute).")
+                    continue
+                if not (cfg_dir / f"proj_{method}.npz").exists():
+                    print(f"[{dataset}/{model}] no proj_{method}.npz, run `python -m pipeline.project` first.")
+                    continue
+                start = time.perf_counter()
+                out = bundle_config(cfg_dir, method)
+                print(f"[{dataset}/{model}] {out.name} ({out.stat().st_size / 1e6:.1f} MB, "
+                      f"{time.perf_counter() - start:.0f}s)", flush=True)
 
 
 if __name__ == "__main__":

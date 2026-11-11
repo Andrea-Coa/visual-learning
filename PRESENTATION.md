@@ -7,14 +7,16 @@ About 8 minutes: 1 min context, 6 min live demo, 1 min takeaways. Numbers come f
 - Open the live site (<https://andrea-coa.github.io/jamona/>) **and** a local copy as a backup:
   `python -m http.server 8000 -d app` (or `python app.py`). D3 is vendored, so the local copy works offline.
 - Browser at 1920×1080 (or full screen), zoom 100 %. Load each dataset once so its files are cached.
-- Start state: MNIST · MLP · t-SNE · View by epoch · sample 500.
+- Start state: MNIST · MLP · Aligned UMAP (the default) · View by epoch · sample 500.
 
 ## Context (1 min)
 
 - Task: show **how a neural network learns**: T1 = across **epochs**, T2 = across **layers** (Rauber et al. 2017).
 - Pipeline: MLP and CNN trained on MNIST, SVHN, CIFAR-10 (Colab T4, 50 epochs); hidden activations of the same
-  1000 test images at 11 snapshot epochs; t-SNE (T1: one joint map per layer; T2: per epoch, initialized from the
-  input map); class-aware trail bundling; static D3 site.
+  1000 test images at 11 snapshot epochs; t-SNE as in the paper (T1: one joint map per layer; T2: per epoch,
+  initialized from the input map); default **Aligned UMAP**, because t-SNE layer maps turn or mirror between layers
+  (42 % of pairs) and Aligned UMAP keeps them steady (0 %) at a small cost in faithfulness; class-aware trail
+  bundling; static D3 site.
 - How to read it: color = true class; triangle = misclassified, colored by the predicted class; NH = how well classes
   separate (share of 6 nearest neighbors with the same class).
 

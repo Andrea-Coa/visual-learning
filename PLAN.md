@@ -23,11 +23,11 @@ based on Rauber et al., *Visualizing the Hidden Activity of Artificial Neural Ne
 | Optimizer | SGD, momentum 0.9, lr 0.01 (batch 16 MLP / 32 CNN), as in paper; **lr 0.001 for SVHN/CIFAR-10 MLP** | Slower than Adam → more visible evolution between epochs. lr 0.01 made the 3072-input MLPs diverge (2026-11-09). |
 | Observation subset | **1000 test images, stratified (100/class), fixed seed**, same subset for every epoch/layer | Task suggests 1000; fixed subset is required to link points across epochs/layers. |
 | Epochs & snapshots | **50 epochs**; snapshots at 0,1,2,3,5,8,12,18,25,35,50 (0 = untrained) — `pipeline/config.py` | Paper used 100; 50 keeps Colab time ~1 h. Largest changes happen in the first epochs (paper Sec. 5.4). |
-| Projection | PCA → 50 dims, then **t-SNE** (`openTSNE`) | Paper uses (Barnes-Hut) t-SNE; openTSNE supports custom initialization, needed below. |
+| Projection | PCA → 50 dims, then **t-SNE** (`openTSNE`); site default **Aligned UMAP** (2026-11-11, S.4), t-SNE kept as an option | Paper uses (Barnes-Hut) t-SNE; openTSNE supports custom initialization, needed below. Findings stay on t-SNE (paper comparison). Default changed because t-SNE T2 maps turn/mirror between layers (42 % of pairs on average) and Aligned UMAP removes that at a small faithfulness cost (S.4). |
 | T1 (epochs) projection | **One joint t-SNE per layer** (every hidden layer + Output) over the union of all epoch snapshots (paper Sec. 5.4, inter-epoch) | Single projection ⇒ no spurious frame-to-frame motion. Every layer is needed by the UI (`VIS_PLAN.md` D1). |
 | T2 (layers) projection | **For every snapshot epoch**, layers Input → hidden → Output; t-SNE of the Input (network input pixels, same at every epoch) is the **initialization** of every other t-SNE (paper Sec. 5.4, inter-layer) | Shared init keeps clusters roughly in place across layers *and* across epochs. |
 | PCA alternative | PCA(2) of **log1p(activations)**, one PCA per frame (T1 and T2), each frame Procrustes-aligned to the previous one | "Dim. red." dropdown (`VIS_PLAN.md` D4). Joint T1 PCA collapsed early epochs to a dot (activation scale grows in training); raw ReLU activations crowd most points into the center (log1p: higher NH, less crowding in 4/4 tested cases). |
-| Evolution view | **Trail bundling** precomputed in Python (KDE edge bundling, own implementation, **class-aware**), **t-SNE only, strengths medium + strong**; "none" drawn from node coordinates; + **animated point transitions** in D3 | Paper uses bundling (CUBu); the assignment additionally *requires* animation. Storing only 2 bundled levels for t-SNE keeps the data ~50 MB. |
+| Evolution view | **Trail bundling** precomputed in Python (KDE edge bundling, own implementation, **class-aware**), **t-SNE + Aligned UMAP (S.4), strengths medium + strong**; "none" drawn from node coordinates; + **animated point transitions** in D3 | Paper uses bundling (CUBu); the assignment additionally *requires* animation. Storing only 2 bundled levels for t-SNE keeps the data ~50 MB. |
 | Quality metric | **Neighborhood hit** (k = 6): computed **in the browser** on the visible sample; also in Python on all 1000 points (report / sanity check) | Same as paper. Browser computation follows the Sample-size control. |
 | Frontend | **Static site**: plain HTML/CSS/JS (ES modules, no build step) + **D3 v7 only** (vendored, pinned), reading precomputed JSON; deployed on **GitHub Pages**; `app.py` = small Flask wrapper serving `app/` | D3-only is an assignment rule. Flask as a backend dropped (user decision, 2026-11-09): all data is precomputed, so a server adds nothing, and a static site can be shared as a link. The wrapper (8.5) was added on 2026-11-10 because the assignment asks for "a Flask application" in the ZIP. |
 
@@ -286,6 +286,36 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 - [ ] S.2 Neuron projections / discriminative neuron map (paper Sec. 6).
 - [ ] S.3 Train-subset vs test-subset comparison (paper Figs. 7–8).
   > note: only test activations were recorded; train activations can be extracted for the final epoch only (`model_final.pt`).
+- [x] S.4 Compare projection methods and keep the best one(s). Done 2026-11-11: **Aligned UMAP is the site default.**
+  > Why: T2 alignment is only "soft" (every layer's t-SNE is just *initialized* from the Input t-SNE). Measured on the
+  > exported coords (epoch 50, consecutive layers): MNIST MLP stays aligned (rotation ≤ 12°, points move ~½ of a random
+  > shuffle), but it breaks where a layer reorganizes neighborhoods: SVHN CNN conv1→conv2 rotates 172° and moves more
+  > than random (0.47 vs 0.36); CIFAR-10 MLP input→h1 rotates 101° (0.45 vs 0.39). T1 (joint t-SNE) is exactly aligned.
+  > Candidates (T1 / T2):
+  > 1. current: joint t-SNE / t-SNE initialized from Input (baseline, paper Sec. 5.4).
+  > 2. t-SNE + Procrustes: same as 1, then rotate/reflect each T2 layer onto the previous one (cheap, NH unchanged).
+  > 3. UMAP: joint UMAP / UMAP initialized from the Input UMAP.
+  > 4. Aligned UMAP (T2 only, layers as the sequence; identity relations, same 1000 points); try 2–3 values of
+  >    `alignment_regularisation` (strong values hide real reorganization, e.g. SVHN conv1→conv2 NH 0.27 → 0.65).
+  > Criteria, per config: NH (k=6) per layer/epoch; alignment (mean displacement vs shuffled baseline + Procrustes
+  > rotation/reflection between consecutive frames); runtime; visual check (spurious jumps vs real reorganization).
+  > Needs: `raw/` activations from Drive (not on the Mac); `umap-learn` in `.venv` + `requirements.txt`.
+  > Integration: winner(s) as extra `coords_<method>.json` (+ trails if bundled) and a new "Dim. red." option; keep t-SNE
+  > as the default because it makes the numbers comparable with the paper. Document the result in README (Design rationale).
+  > note (result): `pipeline/compare.py` over the 6 configs (means): T2 turned/mirrored pairs t-SNE 42 %, UMAP 12 %,
+  > t-SNE+Procrustes 0 %, Aligned UMAP 0 %; T2 movement vs shuffle 0.63 / 0.58 / 0.52 / **0.20**; trustworthiness
+  > 0.928 / 0.909 / 0.928 / 0.896; NH T2 0.683 / 0.673 / 0.683 / 0.670. Table + rationale in README (Design rationale).
+  > Decision (user asked for Aligned UMAP or the best one as default): Aligned UMAP, the only method with steady layer
+  > animation; t-SNE stays selectable and remains the basis of Findings. The Integration note above (keep t-SNE as
+  > default) is superseded by the user's request.
+  > note: alignment_regularisation **0.1** from `--sweep 0.001 0.01 0.1 1` (SVHN/CIFAR-10): smallest value with 0 %
+  > turned pairs; 1.0 costs up to −0.056 NH / −0.06 trust (hides real reorganization).
+  > gotcha: joint T1 UMAP needs `UMAP_JOINT_NEIGHBORS = 50`: with 15, a layer that stops changing (MNIST CNN conv1)
+  > makes the 11 epoch copies of an image each other's neighbors → NH 0.41 (t-SNE 0.90); 50 → 0.91.
+  > note: `raw/` from Drive (Andrea's shared folder `visual-learning/raw`) has only training outputs; proj_tsne/pca and
+  > trails_tsne were rebuilt from `app/data` (inverse export, scratch script) — re-export is byte-identical.
+  > note: site data 66 → 133 MB (5 coords files + 2 trail sets per config). Trails are now `trails/<method>/`.
+  > note: UMAP pinned to `compatibility_layout=True` (umap-learn 0.6 warns its default will change).
 
 ---
 
@@ -314,3 +344,5 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 | 2026-11-10 | Claude | Left column widened 16 → 19 % (min 220 → 250 px), center 64 → 61 %: controls were too tight. No overflow at 1280×720 / 1920×1080. ZIP not rebuilt (user: change not for the submission). |
 | 2026-11-10 | Claude | Left column widened again 19 → 22 % (min 280 px), center 58 %. No overflow at 1280×720 / 1920×1080. ZIP not rebuilt. |
 | 2026-11-11 | Claude | Project renamed to **JaMoNA** (Jimena and Andrea's Model Network Analysis); slug `jamona` in URLs, Colab/Drive paths and the ZIP. New logo `app/img/jamona.svg` (piglet + magnifying glass) in the README, site header and favicon. GitHub repo rename is up to the owner. |
+| 2026-11-11 | Claude | Q&A for the defense (insights, T1/T2, alignment). Measured T2 alignment on exported coords (soft; breaks in SVHN CNN conv1→conv2, CIFAR-10 MLP input→h1). Added S.4 (t-SNE vs t-SNE+Procrustes vs UMAP vs Aligned UMAP), on hold until the user asks. numpy/scipy installed in `.venv` for the analysis. |
+| 2026-11-11 | Claude | S.4 done: UMAP, Aligned UMAP, t-SNE+Procrustes in `project.py`; `compare.py` (NH, trustworthiness, stability, sweep); per-method bundling/export; Aligned UMAP (reg 0.1, joint T1 50 neighbors) is the site default; README rationale + VIS_PLAN updated. `.venv` rebuilt on Python 3.12 (conda env `jamona-py312`). Headless-Chrome check: all methods × 6 configs, 0 errors. |
