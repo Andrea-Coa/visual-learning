@@ -23,11 +23,11 @@ based on Rauber et al., *Visualizing the Hidden Activity of Artificial Neural Ne
 | Optimizer | SGD, momentum 0.9, lr 0.01 (batch 16 MLP / 32 CNN), as in paper; **lr 0.001 for SVHN/CIFAR-10 MLP** | Slower than Adam → more visible evolution between epochs. lr 0.01 made the 3072-input MLPs diverge (2026-11-09). |
 | Observation subset | **1000 test images, stratified (100/class), fixed seed**, same subset for every epoch/layer | Task suggests 1000; fixed subset is required to link points across epochs/layers. |
 | Epochs & snapshots | **50 epochs**; snapshots at 0,1,2,3,5,8,12,18,25,35,50 (0 = untrained) — `pipeline/config.py` | Paper used 100; 50 keeps Colab time ~1 h. Largest changes happen in the first epochs (paper Sec. 5.4). |
-| Projection | PCA → 50 dims, then **t-SNE** (`openTSNE`); site default **Aligned UMAP** (2026-11-11, S.4), t-SNE kept as an option | Paper uses (Barnes-Hut) t-SNE; openTSNE supports custom initialization, needed below. Findings stay on t-SNE (paper comparison). Default changed because t-SNE T2 maps turn/mirror between layers (42 % of pairs on average) and Aligned UMAP removes that at a small faithfulness cost (S.4). |
+| Projection | PCA → 50 dims, then **t-SNE** (`openTSNE`); site default **Aligned UMAP grid** (2026-11-11, S.4 → S.5), t-SNE kept as an option | Paper uses (Barnes-Hut) t-SNE; openTSNE supports custom initialization, needed below. Findings stay on t-SNE (paper comparison). Default changed because t-SNE T2 maps turn/mirror between layers (42 % of pairs on average) and Aligned UMAP removes that at a small faithfulness cost (S.4); the grid variant also gives T1 and T2 one shared map (S.5). |
 | T1 (epochs) projection | **One joint t-SNE per layer** (every hidden layer + Output) over the union of all epoch snapshots (paper Sec. 5.4, inter-epoch) | Single projection ⇒ no spurious frame-to-frame motion. Every layer is needed by the UI (`VIS_PLAN.md` D1). |
 | T2 (layers) projection | **For every snapshot epoch**, layers Input → hidden → Output; t-SNE of the Input (network input pixels, same at every epoch) is the **initialization** of every other t-SNE (paper Sec. 5.4, inter-layer) | Shared init keeps clusters roughly in place across layers *and* across epochs. |
 | PCA alternative | PCA(2) of **log1p(activations)**, one PCA per frame (T1 and T2), each frame Procrustes-aligned to the previous one | "Dim. red." dropdown (`VIS_PLAN.md` D4). Joint T1 PCA collapsed early epochs to a dot (activation scale grows in training); raw ReLU activations crowd most points into the center (log1p: higher NH, less crowding in 4/4 tested cases). |
-| Evolution view | **Trail bundling** precomputed in Python (KDE edge bundling, own implementation, **class-aware**), **t-SNE + Aligned UMAP (S.4), strengths medium + strong**; "none" drawn from node coordinates; + **animated point transitions** in D3 | Paper uses bundling (CUBu); the assignment additionally *requires* animation. Storing only 2 bundled levels for t-SNE keeps the data ~50 MB. |
+| Evolution view | **Trail bundling** precomputed in Python (KDE edge bundling, own implementation, **class-aware**), **t-SNE + Aligned UMAP + grid (S.4/S.5), strengths medium + strong**; "none" drawn from node coordinates; + **animated point transitions** in D3 | Paper uses bundling (CUBu); the assignment additionally *requires* animation. Storing only 2 bundled levels for t-SNE keeps the data ~50 MB. |
 | Quality metric | **Neighborhood hit** (k = 6): computed **in the browser** on the visible sample; also in Python on all 1000 points (report / sanity check) | Same as paper. Browser computation follows the Sample-size control. |
 | Frontend | **Static site**: plain HTML/CSS/JS (ES modules, no build step) + **D3 v7 only** (vendored, pinned), reading precomputed JSON; deployed on **GitHub Pages**; `app.py` = small Flask wrapper serving `app/` | D3-only is an assignment rule. Flask as a backend dropped (user decision, 2026-11-09): all data is precomputed, so a server adds nothing, and a static site can be shared as a link. The wrapper (8.5) was added on 2026-11-10 because the assignment asks for "a Flask application" in the ZIP. |
 
@@ -316,6 +316,20 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
   > trails_tsne were rebuilt from `app/data` (inverse export, scratch script) — re-export is byte-identical.
   > note: site data 66 → 133 MB (5 coords files + 2 trail sets per config). Trails are now `trails/<method>/`.
   > note: UMAP pinned to `compatibility_layout=True` (umap-learn 0.6 warns its default will change).
+- [x] S.5 Unify T1 and T2 in one map (user question: switching views rearranged every point). Done 2026-11-11:
+      **`grid` (Aligned UMAP grid) is the site default.**
+  > How: one AlignedUMAP over the layers whose frames are the layers' activations of all epochs stacked (rows
+  > e·N + i), identity relations, 50 neighbors, regularisation 0.1; Input UMAP rotated + scaled onto the first hidden
+  > layer (epoch mean); one normalization for the whole grid; T1[l][e] == T2[e][l]. `coords_grid.json` has
+  > `unified: true`; the scatter then keeps `keyOf` across a mode change, so the points stay put (no §6 fade).
+  > Result (means, `compare.py`, new metric `mode_jump`): NH T1 0.642 / NH T2 0.704 (best of all, t-SNE 0.639 /
+  > 0.683), T1 movement 0.175 (steadiest), mode jump 0 (others 0.79–0.98), T2 movement 0.287 (Aligned UMAP 0.200),
+  > turned pairs 2 % — all Input → first layer (Input is fitted separately), 0 % between hidden layers; trust 0.891
+  > (Aligned UMAP 0.896, t-SNE 0.928). Time 4–12 min per config.
+  > gotcha: headless Chrome with `--virtual-time-budget` fast-forwards timers while the ~1 MB coords files are
+  > still loading, so projection-switch checks looked broken; verified in real time with Playwright (scratch env):
+  > grid keeps points on T1↔T2, t-SNE / Aligned UMAP fade and move, 0 page errors.
+  > note: site data now 187 MB (6 coords files + 3 trail sets per config).
 
 ---
 
@@ -350,3 +364,4 @@ One item per panel, in build order; § = section of `VIS_PLAN.md`, which holds t
 | 2026-11-11 | Claude | Pages deploy failed twice (GitHub-side): first "artifact not found" 1 s after a successful upload, then "multiple artifacts" after a full re-run. Workflow split into `build` + `deploy` jobs (official layout; re-running the deploy job reuses the artifact), `cancel-in-progress: false`. Fix for the failed run: start a new run (Actions -> Run workflow), not a re-run. |
 | 2026-11-11 | Claude | Q&A for the defense (insights, T1/T2, alignment). Measured T2 alignment on exported coords (soft; breaks in SVHN CNN conv1→conv2, CIFAR-10 MLP input→h1). Added S.4 (t-SNE vs t-SNE+Procrustes vs UMAP vs Aligned UMAP), on hold until the user asks. numpy/scipy installed in `.venv` for the analysis. |
 | 2026-11-11 | Claude | S.4 done: UMAP, Aligned UMAP, t-SNE+Procrustes in `project.py`; `compare.py` (NH, trustworthiness, stability, sweep); per-method bundling/export; Aligned UMAP (reg 0.1, joint T1 50 neighbors) is the site default; README rationale + VIS_PLAN updated. `.venv` rebuilt on Python 3.12 (conda env `jamona-py312`). Headless-Chrome check: all methods × 6 configs, 0 errors. |
+| 2026-11-11 | Claude | S.5 done: `grid` method (Aligned UMAP over layer frames of stacked epochs = one map for T1 and T2), `mode_jump` metric, unified flag in coords + scatter keeps points on view switch; grid is the new default (best NH, steadiest T1, zero view-switch jump). Docs updated. Real-time Playwright check passes. |

@@ -27,7 +27,7 @@ from . import config
 SCALE = 9999          # coordinate quantization (same as pipeline.bundle)
 PROB_SCALE = 1000     # probabilities are stored as integers in per mille
 SPRITE_COLUMNS = 40   # 1000 images -> 40 x 25 grid
-METHODS = ("tsne", "pca", "umap", "aumap", "tsne_proc")  # exported when raw/ has proj_<method>.npz
+METHODS = ("tsne", "pca", "umap", "aumap", "tsne_proc", "grid")  # exported when raw/ has proj_<method>.npz
 DISPLAY_NAMES = {"mnist": "MNIST", "svhn": "SVHN", "cifar10": "CIFAR-10", "mlp": "MLP", "cnn": "CNN"}
 
 # Layer descriptions for the architecture panel. Must match pipeline/models.py.
@@ -146,12 +146,15 @@ def export_nodes(raw: Path, cfg_dir: Path, dataset: str, epochs: list[int]) -> d
 
 
 def export_coords(proj: np.lib.npyio.NpzFile) -> dict:
-    return {
+    coords = {
         "scale": SCALE,
         # t1[layer][epoch] and t2[epoch][layer] are flat [x0, y0, x1, y1, ...] arrays
         "t1": dict(zip([str(n) for n in proj["t1_layers"]], quantize(proj["t1"]))),
         "t2": quantize(proj["t2"]),
     }
+    if "unified" in proj.files and bool(proj["unified"]):
+        coords["unified"] = True  # T1 and T2 share coordinates (grid): the UI keeps points on a view switch
+    return coords
 
 
 def export_trails(cfg_dir: Path, out_dir: Path, method: str) -> int:

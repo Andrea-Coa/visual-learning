@@ -210,11 +210,11 @@ On an 8-core laptop, PCA takes ~10 s per configuration and t-SNE ~15 min (~1.5 h
 - PCA uses `log1p` of the activations (ReLU outputs are heavy-tailed); t-SNE uses PCA-50 of the raw activations.
 - The neighborhood hit (k = 6, share of each point's 6 nearest neighbors in the same class) is stored for every frame.
 
-**Alternative projections (PLAN S.4).** The site's default is **Aligned UMAP**; t-SNE stays available (and is the
-basis of every number in "Findings", which compare with the paper).
+**Alternative projections (PLAN S.4, S.5).** The site's default is **Aligned UMAP grid**; t-SNE stays available (and
+is the basis of every number in "Findings", which compare with the paper).
 
 ```bash
-python -m pipeline.project --method umap aumap tsne_proc   # ~2 + ~3.5 min per configuration; tsne_proc: seconds
+python -m pipeline.project --method umap aumap tsne_proc grid   # ~2 / ~3.5 / 4–12 min per configuration; tsne_proc: seconds
 python -m pipeline.compare                                  # comparison table -> raw/projection_comparison.json
 python -m pipeline.compare --sweep 0.001 0.01 0.1 1 --dataset svhn cifar10   # Aligned UMAP regularisation sweep
 ```
@@ -225,6 +225,11 @@ python -m pipeline.compare --sweep 0.001 0.01 0.1 1 --dataset svhn cifar10   # A
 - `aumap` (Aligned UMAP): T1 = the joint UMAP; T2 = one AlignedUMAP per epoch over Input → … → Output, which
   penalizes moving a point away from its position in the neighboring layers (`alignment_regularisation` 0.1).
 - `tsne_proc`: the t-SNE frames with every T2 layer rotated / reflected onto the previous one (Procrustes).
+- `grid` (Aligned UMAP grid): **one set of coordinates for both views**. AlignedUMAP runs over the layers, and each
+  of its frames is one layer with all epochs stacked (like the joint T1 map, so epochs are exactly aligned); the
+  movement penalty aligns consecutive layers (like T2). T1 and T2 are then two directions through the same
+  layer × epoch grid, so switching views keeps every point in place (`unified` in `coords_grid.json`). The Input
+  (identical at every epoch) is rotated onto the first hidden layer.
 - UMAP runs single-threaded (fixed seed) with umap-learn's classic layout (`compatibility_layout=True`), so it is
   reproducible.
 
@@ -314,7 +319,7 @@ All JSON is compact. **Coordinates** are integers `0..9999` in the unit square, 
 | `<ds>/sprites.png` | the 1000 subset images in a grid of `columns` cells of `cell`×`cell` px; image `i` is at column `i % columns`, row `floor(i / columns)` |
 | `<ds>/<model>/meta.json` | `classes`, `epochs` (snapshot epochs), `layers[]` {`id`, `label`, `units`, `type`, `dropout`} from Input to Output, `t1Layers`, `t2Layers`, `training` (hyperparameters), `history` {`epoch`, `trainAcc`, `testAcc`, `trainLoss`, `testLoss`} for every epoch 0–50, `metrics` {`testAcc`, `trainAcc`, `paperTestAcc`, `bestEpoch`, `bestTestAcc`} |
 | `<ds>/<model>/nodes.json` | `n`, `labels[obs]`, `testIndex[obs]` (index in the original test set), `sampleOrder` (the first 100·k ids hold 10·k per class; identical for both models), `preds[epoch][obs]`, `probs[epoch]` = flat `[obs × 10]` probabilities in per mille (`probScale` = 1000) |
-| `<ds>/<model>/coords_<method>.json` | `t1[layer][epoch]` and `t2[epoch][layer]`, each a flat point array. `epoch` indexes `meta.epochs`; `layer` names follow `t1Layers` (keys) / `t2Layers` (order) |
+| `<ds>/<model>/coords_<method>.json` | `t1[layer][epoch]` and `t2[epoch][layer]`, each a flat point array; `unified: true` (grid only) = both views share coordinates. `epoch` indexes `meta.epochs`; `layer` names follow `t1Layers` (keys) / `t2Layers` (order) |
 | `<ds>/<model>/trails/<method>/t1_<layer>.json`, `t2_e<epoch>.json` | bundled methods only (`trails` in `index.json`): `strengths` (`medium`, `strong`), `samplesPerSegment` (4), `trails[strength][obs]` = flat point array of the bundled trail; point `i` belongs to step `i / 4` (an epoch index for T1, a layer index for T2). Unbundled trails: join the points of `coords` directly |
 
 ## Using the site
@@ -337,23 +342,29 @@ All JSON is compact. **Coordinates** are integers `0..9999` in the unit square, 
   frames; paper Sec. 5.4). T2 projects every layer of an epoch separately, but **every t-SNE starts from the Input
   t-SNE**, which keeps clusters roughly in place across layers and across epochs. PCA (of `log1p` activations,
   Procrustes-aligned) is offered for contrast: it keeps global variance and shows how much t-SNE "cleans up".
-- **Default projection: Aligned UMAP.** The initialization trick keeps T2 aligned only softly: measured on the
+- **Default projection: Aligned UMAP grid.** The initialization trick keeps T2 aligned only softly: measured on the
   t-SNE maps, 55–65 % of consecutive layer pairs of SVHN / CIFAR-10 come out rotated by more than 90° or mirrored,
   i.e. the animation shows a turn that is not in the data. We compared five methods (`pipeline/compare.py`, all
   six configurations). Aligned UMAP is the only one with steady T2 maps: 0 % turned pairs and points moving 0.06–0.34
-  of a random shuffle, vs 0.42–0.77 for t-SNE. The cost is small and measured: T2 trustworthiness −0.007 to −0.047
-  and NH −0.043 to +0.009 vs t-SNE. t-SNE stays one click away because it is the paper's method (Findings compare with it).
+  of a random shuffle, vs 0.42–0.77 for t-SNE. With two separate projections, though, switching between T1 and T2
+  still rearranges every point (as far as a random shuffle). The **grid** variant (S.5) fixes that too: one map for
+  both views, the best NH of all methods (even above t-SNE), the steadiest epoch animation, and only Input → first
+  layer pairs ever turn (2 %, the Input is fitted separately). Cost: T2 trustworthiness −0.005 vs Aligned UMAP and
+  −0.037 vs t-SNE (mean), and ~4–12 min per configuration. t-SNE stays one click away because it is the paper's
+  method (Findings compare with it).
 
-  | (mean of 6 configs) | NH T1 | NH T2 | trustworthiness | T2 movement (1 = random) | T2 turned pairs | time / config |
-  |---|---|---|---|---|---|---|
-  | t-SNE (paper) | 0.639 | 0.683 | 0.928 | 0.631 | 42 % | ~15 min |
-  | t-SNE + Procrustes | 0.639 | 0.683 | 0.928 | 0.517 | 0 % | seconds |
-  | UMAP | 0.626 | 0.673 | 0.909 | 0.576 | 12 % | ~2 min |
-  | **Aligned UMAP** | 0.626 | 0.670 | 0.896 | **0.200** | **0 %** | ~3.5 min |
-  | PCA | 0.451 | 0.500 | 0.802 | 0.592 | 0 % | ~10 s |
+  | (mean of 6 configs) | NH T1 | NH T2 | trust. | T2 movement (1 = random) | T2 turned pairs | T1 movement | T1 ↔ T2 jump | time / config |
+  |---|---|---|---|---|---|---|---|---|
+  | t-SNE (paper) | 0.639 | 0.683 | **0.928** | 0.631 | 42 % | 0.204 | 0.886 | ~15 min |
+  | t-SNE + Procrustes | 0.639 | 0.683 | **0.928** | 0.517 | 0 % | 0.204 | 0.880 | seconds |
+  | UMAP | 0.626 | 0.673 | 0.909 | 0.576 | 12 % | 0.212 | 0.984 | ~2 min |
+  | Aligned UMAP | 0.626 | 0.670 | 0.896 | **0.200** | 0 % | 0.212 | 0.964 | ~3.5 min |
+  | **Aligned UMAP grid** | **0.642** | **0.704** | 0.891 | 0.287 | 2 % | **0.175** | **0** | 4–12 min |
+  | PCA | 0.451 | 0.500 | 0.802 | 0.592 | 0 % | 0.437 | 0.788 | ~10 s |
 
   NH T1 = all T1 frames; NH T2 and trustworthiness (k = 10, against the layer's activations) = the last epoch's
-  layers. Movement = mean displacement between consecutive layers divided by that of shuffled points.
+  layers. Movement = mean displacement between consecutive layers (T2) / epochs (T1) divided by that of shuffled
+  points. T1 ↔ T2 jump = the same between the T1 and T2 frames of one (layer, epoch), i.e. what a view switch shows.
 - **Quality you can read.** The neighborhood hit (NH, k = 6), the paper's metric, is computed in the browser on the
   points shown, so it follows the sample size. It appears as a badge with its change from the previous step, as the
   separation bars of the architecture panel and in the tooltips of the Layer / Epoch steps. Sample accuracy sits next to it.

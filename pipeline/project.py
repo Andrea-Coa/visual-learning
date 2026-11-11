@@ -22,6 +22,10 @@ can rotate or flip its map):
                over the sequence Input -> ... -> Output (same observations in every frame), which penalizes moving a
                point away from its position in the neighboring layers. The whole sequence is then rotated onto the
                Input UMAP so that epochs share an orientation.
+    grid       Aligned UMAP over the layer x epoch grid: ONE set of coordinates for both views (T1 frames = T2
+               frames). Every AlignedUMAP frame is one layer with all its epochs stacked (as the joint T1 map, so
+               epochs are exactly aligned) and consecutive layers are aligned with the movement penalty (as T2).
+               The Input UMAP is rotated onto the first hidden layer. One normalization for the whole grid.
 
 Normalization keeps the aspect ratio (the shorter side is centered).
 
@@ -54,7 +58,7 @@ from sklearn.neighbors import NearestNeighbors
 
 from . import config
 
-METHODS = ("tsne", "pca", "umap", "aumap", "tsne_proc")
+METHODS = ("tsne", "pca", "umap", "aumap", "tsne_proc", "grid")
 DEFAULT_METHODS = ("tsne", "pca")
 PCA_DIMS = 50     # activations are reduced to 50 dims before t-SNE (standard practice, faster)
 PERPLEXITY = 30   # openTSNE default, as the paper used default parameters
@@ -242,6 +246,39 @@ def project_config(raw: Path, dataset: str, model: str, method: str,
     return out
 
 
+def project_grid(raw: Path, dataset: str, model: str, labels: np.ndarray, input_ref: np.ndarray) -> Path:
+    """`grid`: one Aligned UMAP over the layers, each frame = the layer's activations of all epochs stacked."""
+    t0 = time.perf_counter()
+    cfg_dir = raw / dataset / model
+    cfg = json.loads((cfg_dir / "config.json").read_text())
+    epochs = cfg["snapshot_epochs"]
+    hidden = list(cfg["layers"])
+    t1_layers, t2_layers = hidden + ["output"], ["input"] + hidden + ["output"]
+    n, tag = len(labels), f"[{dataset}/{model}/grid]"
+    import umap
+    stacked = [reduce_dims(np.concatenate([load_layer(cfg_dir, e, layer) for e in epochs])) for layer in t1_layers]
+    identity = {i: i for i in range(len(epochs) * n)}  # observation i at epoch e is row e * n + i in every frame
+    mapper = umap.AlignedUMAP(n_neighbors=UMAP_JOINT_NEIGHBORS, min_dist=UMAP_MIN_DIST, random_state=config.SEED,
+                              alignment_regularisation=ALIGNMENT_REG, compatibility_layout=True)
+    mapper.fit(stacked, relations=[identity] * (len(stacked) - 1))
+    layers = np.stack([np.asarray(e, np.float32).reshape(len(epochs), n, 2) for e in mapper.embeddings_])
+    # Input (identical at every epoch): rigid + scale match onto the first hidden layer, averaged over epochs.
+    target = layers[0].mean(0)
+    src, dst = input_ref - input_ref.mean(0), target - target.mean(0)
+    rotation, _ = orthogonal_procrustes(src, dst)
+    x_in = src @ rotation * (np.linalg.norm(dst) / np.linalg.norm(src)) + target.mean(0)
+    grid = normalize(np.concatenate([np.broadcast_to(x_in, (1, len(epochs), n, 2)), layers]))  # [T2 layer, epoch, ...]
+    t1, t2 = grid[1:], grid.transpose(1, 0, 2, 3)
+    nh_t1 = np.array([[neighborhood_hit(frame, labels) for frame in layer] for layer in t1], np.float32)
+    nh_t2 = np.array([[neighborhood_hit(frame, labels) for frame in epoch] for epoch in t2], np.float32)
+    out = cfg_dir / "proj_grid.npz"
+    np.savez_compressed(out, t1=t1, t2=np.ascontiguousarray(t2), nh_t1=nh_t1, nh_t2=nh_t2, epochs=np.array(epochs),
+                        t1_layers=np.array(t1_layers), t2_layers=np.array(t2_layers), labels=labels,
+                        unified=True, seconds=np.float32(time.perf_counter() - t0))
+    print(f"{tag} {time.perf_counter() - t0:.0f}s | NH last hidden @epoch{epochs[-1]} {nh_t2[-1, -2]:.3f}", flush=True)
+    return out
+
+
 def procrustes_chain(cfg_dir: Path) -> Path:
     """t-SNE + Procrustes (`tsne_proc`): the t-SNE frames, with every T2 layer rotated/reflected onto the previous one."""
     t0 = time.perf_counter()
@@ -288,9 +325,12 @@ def main() -> None:
             # The Input projection depends only on the dataset: compute it once for both models.
             cfg = json.loads((args.raw / dataset / todo[0] / "config.json").read_text())
             labels, x_input = load_input(args.raw, dataset, cfg)
-            input_ref = {"tsne": tsne, "umap": umap2, "aumap": umap2}.get(method, pca2)(x_input)
+            input_ref = {"tsne": tsne, "umap": umap2, "aumap": umap2, "grid": umap2}.get(method, pca2)(x_input)
             for model in todo:
-                project_config(args.raw, dataset, model, method, labels, input_ref)
+                if method == "grid":
+                    project_grid(args.raw, dataset, model, labels, input_ref)
+                else:
+                    project_config(args.raw, dataset, model, method, labels, input_ref)
 
 
 if __name__ == "__main__":

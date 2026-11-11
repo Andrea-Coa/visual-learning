@@ -10,6 +10,8 @@ Per configuration and method (every raw/<dataset>/<model>/proj_<method>.npz foun
     flips_t2     share of consecutive T2 layer pairs whose best rigid match needs a rotation > 90° or a
                  reflection, i.e. the map visibly turned or mirrored between two layers
     move_t1      the same as move_t2 between consecutive epochs of T1
+    mode_jump    the same between the T1 and the T2 frame of one (layer, epoch): how far points jump when the view
+                 switches between T1 and T2 (0 for `grid`, whose two views share coordinates)
     seconds      projection wall time (stored by the S.4 methods only)
 
 The S.4 decision weighs steadiness (move, flips) against faithfulness (nh, trust): an aligned method that
@@ -36,7 +38,7 @@ from .project import (METHODS, aligned_umap, load_input, load_snapshot, neighbor
                       reduce_dims, umap2)
 
 TRUST_K = 10
-METRICS = ("nh_t1", "nh_t2", "trust", "move_t2", "flips_t2", "move_t1", "seconds")
+METRICS = ("nh_t1", "nh_t2", "trust", "move_t2", "flips_t2", "move_t1", "mode_jump", "seconds")
 
 
 def frame_change(a: np.ndarray, b: np.ndarray, rng: np.random.Generator) -> tuple[float, bool]:
@@ -64,6 +66,8 @@ def evaluate(proj: np.lib.npyio.NpzFile, last_acts: dict[str, np.ndarray]) -> di
     t1, t2, layers = proj["t1"], proj["t2"], [str(name) for name in proj["t2_layers"]]
     move_t2, flips_t2 = zip(*(sequence_change(epoch_frames, rng) for epoch_frames in t2))
     move_t1 = [sequence_change(layer_frames, rng)[0] for layer_frames in t1]
+    mode_jump = [frame_change(t1[li][ei], t2[ei][layers.index(str(name))], rng)[0]
+                 for li, name in enumerate(proj["t1_layers"]) for ei in range(len(t2))]
     return {
         "nh_t1": float(proj["nh_t1"].mean()),
         "nh_t2": float(proj["nh_t2"][-1, 1:].mean()),
@@ -71,6 +75,7 @@ def evaluate(proj: np.lib.npyio.NpzFile, last_acts: dict[str, np.ndarray]) -> di
         "move_t2": float(np.mean(move_t2)),
         "flips_t2": float(np.mean(flips_t2)),
         "move_t1": float(np.mean(move_t1)),
+        "mode_jump": float(np.mean(mode_jump)),
         "seconds": float(proj["seconds"]) if "seconds" in proj.files else None,
     }
 

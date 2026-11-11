@@ -38,7 +38,7 @@ Three columns, same structure as draft-v2. Additions to the draft are marked ★
 │ 🐷 JaMoNA         │ EMBEDDINGS VIEW                     [Pan|Brush] ⟲│ MODEL METRICS     ▾ │
 │───────────────────│ ┌──────────────────────────────────────────────┐ │ Confusion matrix    │
 │ Dataset   [MNIST▾]│ │                                  ★NH 0.94    │ │ (at current epoch)  │
-│ Dim. red. [AUMAP▾]│ │      scatterplot  ⇄  trail (path) view       │ │ [ ] hide diagonal   │
+│ Dim. red. [Grid ▾]│ │      scatterplot  ⇄  trail (path) view       │ │ [ ] hide diagonal   │
 │ ANN       [MLP  ▾]│ │                                  ★Acc 98.4%  │ │                     │
 │ View by   [epoch▾]│ │ ┌Legend ▾┐                                   │ │ Per-class [Recall▾] │
 │ Sample    [-500+] │ │ │■ 0 ... │                                   │ │ ▮▮▮▮▮▮▮▮▮▮ (class   │
@@ -86,7 +86,7 @@ interaction is automatically linked).
 |---|---|---|
 | `dataset` | mnist · svhn · cifar10 | Dataset dropdown |
 | `model` | mlp · cnn | ANN dropdown |
-| `projection` | aumap · umap · tsne · tsne_proc · pca | Dim. red. dropdown (default aumap, PLAN S.4) |
+| `projection` | grid · aumap · umap · tsne · tsne_proc · pca | Dim. red. dropdown (default grid, PLAN S.4/S.5) |
 | `mode` | `epoch` (T1) · `layer` (T2) | View-by dropdown, click on architecture layer |
 | `layer` | Input, hidden layers, Output | Layer stepper, architecture panel |
 | `epoch` | snapshot epochs 0,1,2,3,5,8,12,18,25,35,50 | Epoch stepper, learning curve, Play |
@@ -162,7 +162,7 @@ interaction is automatically linked).
 | Control | Spec |
 |---|---|
 | **Dataset** [M] | MNIST · SVHN · CIFAR-10. |
-| **Dim. red.** [M] | Aligned UMAP (default since PLAN S.4) · UMAP · t-SNE · t-SNE + Procrustes · PCA. The ⓘ tooltip explains each method and how it is aligned. |
+| **Dim. red.** [M] | Aligned UMAP grid (default, PLAN S.5: one map for T1 and T2, so a view switch keeps the points in place instead of the §6 fade) · Aligned UMAP · UMAP · t-SNE · t-SNE + Procrustes · PCA. The ⓘ tooltip explains each method and how it is aligned. |
 | **ANN** [M] | MLP · CNN. Architecture panel and Layer stepper update. |
 | **View by** [M] | epoch (T1) · layer (T2). Also changed by clicking the architecture panel. Label shows the task: "epoch (T1)", "layer (T2)". |
 | **Sample** [M] | Spinner 100–1000, step 100, default 500. Text below: "balanced: 50 per class · same points at every step". The sample is a fixed, nested ordering (first *n* of a pre-shuffled stratified list), so growing it only adds points. |
@@ -365,7 +365,7 @@ All items are feasible with the training outputs in `raw/` (no retraining). Reso
 | D2 | Scatter, T2 | 2D coords per (layer, epoch), T2 chained projection | ✓ every snapshot epoch. Every layer's t-SNE is initialized from the Input t-SNE, which is the same at every epoch, so the Epoch row in T2 is also stable. PLAN 3.3 |
 | D3 | Layer stepper | Input and Output as extra layers in T2 | ✓ Input = network input (normalized pixels); Output = softmax (only probabilities were stored, not logits) |
 | D4 | Dim. red. dropdown | PCA versions of D1/D2 | ✓ T2 PCA frames aligned to the Input PCA (Procrustes) so they don't flip between layers |
-| D5 | Path view | Bundled trails | ✓ **t-SNE and Aligned UMAP (PLAN S.4), strengths medium + strong stored**; "none" = straight polylines drawn from D1/D2; PCA trails are never bundled (Bundling control disabled). Coordinates as integers 0–9999, ~4 points per segment, one file per view, loaded on demand (~50 MB total) |
+| D5 | Path view | Bundled trails | ✓ **t-SNE, Aligned UMAP and Aligned UMAP grid (PLAN S.4/S.5), strengths medium + strong stored**; "none" = straight polylines drawn from D1/D2; PCA trails are never bundled (Bundling control disabled). Coordinates as integers 0–9999, ~4 points per segment, one file per view, loaded on demand (~50 MB total) |
 | D6 | Quality badge, separation bars, filmstrip | NH | ✓ **computed in the browser** (k = 6) on the points currently shown, so it follows the Sample size. Separation bars = NH of the **T2** projection of each layer at the current epoch (in both modes). Python also computes NH on all 1000 points for the report |
 | D7 | Glyphs, matrix, bars, data point | predictions + softmax per (observation, epoch) | ✓ saved per snapshot (sample only; full test-set confusion matrix exists only for the final epoch) |
 | D8 | Learning curve | train/test accuracy and loss for every epoch 0–50 | ✓ `history.json` |
