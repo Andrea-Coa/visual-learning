@@ -67,8 +67,11 @@ Three columns, same structure as draft-v2. Additions to the draft are marked ★
 - The embeddings plot fills the panel; the data keep the **same scale on both axes** (a centered square above the
   steppers), so t-SNE distances are not distorted.
 - Collapsible panels (▾) as in the draft: Model Metrics and Data Point can be collapsed to give space.
-- **Review 2026-11-10 (user feedback):** side columns narrowed to **22 / 58 / 20 %** (min 280 px / 260 px) so the
-  embeddings view dominates (1095 px wide at 1920; 16 % and 19 % for the left column were too tight for the controls); the **Image view is collapsible too** (title or ▾ at the far right;
+- **Review 2026-11-10 (user feedback):** side columns narrowed to **21 / 58 / 21 %**, equal (min 280 px each) so
+  the embeddings view dominates (1095 px wide at 1920; 16 % and 19 % for the left column were too tight for the
+  controls); **Model metrics is sized to its content** (≤ 55 % of the column, shorter per-class bars) and the
+  **Data point panel takes the rest** (+~90 px at 1920); the confusion matrix no longer repeats the epoch (ⓘ says it);
+  the **Image view is collapsible too** (title or ▾ at the far right;
   the embeddings view takes its height); the **steppers box is draggable** like the legend (grip on its left edge,
   kept inside the plot); the legend is as narrow as its class rows, its "misclassified" key wraps.
 
@@ -195,14 +198,16 @@ interaction is automatically linked).
 - Title line above the plot, generated from state, e.g. *"MNIST · MLP · layer h4 · epoch 8 · t-SNE"*.
 - ★ **Quality badge** (top-right corner of the plot): `NH 0.94` and `Sample acc 98.4 %` (accuracy of the shown
   sample at that epoch; labelled "sample" because it differs slightly from the full-test-set learning curve). Both are
-  computed in the browser on the visible points. Each badge has a tiny delta vs the previous step (`▲ 0.06`).
+  computed in the browser on the visible points. Each badge has a tiny signed delta vs the previous step (`+0.06`, `−0.02`, `±0.00`; no ▲ ▼, because the
+  triangle already means "misclassified").
   An ⓘ icon next to the badges explains NH on hover. [M]
 - **Legend** (draft-v2): collapsible, draggable box listing class color chips + names + count of visible points.
   **Click** a class = isolate (toggle in `classFilter`); **shift-click** = add to selection; **double-click** = reset.
   Hover a legend entry = temporary highlight of that class. Also contains the triangle glyph key
   ("▲ misclassified, colored by prediction"). [M]
 - **Zoom & pan** (`d3.zoom`, scroll + drag), reset button ⟲, zoom 1×–8×. Point radius stays constant on zoom. [M]
-- **Brush:** toolbar toggle `[Pan | Brush]` (also Shift+drag in pan mode). Rectangular brush → `brushed`.
+- **Brush:** toolbar toggle `[Pan | Brush]` (also Shift+drag in pan mode). **Freeform (lasso) brush**: the drawn shape
+  is closed into a polygon and the points inside it → `brushed` (in the path view: the trail ends).
   Click on empty space clears the brush. [M]
 - **Hover tooltip** (details on demand) [M]: image thumbnail (64 px, pixelated scaling), `id`, *true: 3*,
   *predicted: 5 (conf 0.71)*, both with color chips. Appears after 80 ms, follows the cursor, never covers the point.

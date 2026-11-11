@@ -26,7 +26,8 @@ const COMET = [0.5, 0.32, 0.16];  // opacity of the pinned point's last position
 const DURATION = { swapOut: 200, swapIn: 200, sample: 300, fade: 250, reset: 400 };
 
 const NH_INFO = "NH (neighborhood hit): share of each point's 6 nearest neighbors in this projection that have "
-  + "its class. Sample acc: accuracy of the shown points at this epoch. ▲ ▼: change from the previous step.";
+  + "its class. Sample acc: accuracy of the shown points at this epoch. +/−: change from the previous step "
+  + "(previous epoch or layer).";
 
 /** The frame shown for a state, and the frame of the previous step of the active dimension (null at the first). */
 function framesFor(config, coords, state) {
@@ -88,7 +89,7 @@ export function initScatter(container, { store, data, tools, overlay }) {
   const paths = new PathLayer(zoomLayer, glyphScale);
   const cometG = zoomLayer.append("g").attr("class", "comet");
   const trajectoryG = zoomLayer.append("g").attr("class", "trajectory");
-  const brushRect = svg.append("rect").attr("class", "brush-rect").style("display", "none");
+  const lassoPath = svg.append("path").attr("class", "lasso").style("display", "none");
 
   const badges = root.append("div").attr("class", "badges");
   const badgeRows = {};
@@ -132,7 +133,8 @@ export function initScatter(container, { store, data, tools, overlay }) {
     .data([{ id: "pan", name: "Pan" }, { id: "brush", name: "Brush" }])
     .join("button")
     .attr("type", "button")
-    .attr("title", (d) => (d.id === "brush" ? "Select points (or Shift + drag)" : "Drag to pan, scroll to zoom"))
+    .attr("title", (d) => (d.id === "brush" ? "Draw a freeform shape around points to select them (or Shift + drag)"
+      : "Drag to pan, scroll to zoom"))
     .text((d) => d.name)
     .on("click", (event, d) => setBrushMode(d.id === "brush"));
   toolbar.append("button").attr("type", "button").attr("class", "tool-btn tool-icon")
@@ -186,35 +188,37 @@ export function initScatter(container, { store, data, tools, overlay }) {
     });
   svg.call(zoom).on("dblclick.zoom", null);
 
-  let brushOrigin = null;
-  const brushBox = (event) => {
-    const [x0, y0] = brushOrigin;
-    const cx = Math.max(0, Math.min(width, event.x));
-    const cy = Math.max(0, Math.min(height, event.y));
-    return [Math.min(x0, cx), Math.min(y0, cy), Math.max(x0, cx), Math.max(y0, cy)];
-  };
+  // Freeform brush (lasso): the pointer path is closed into a polygon; the points inside it are brushed.
+  let lasso = [];               // polygon vertices in screen px (svg coordinates)
+  const LASSO_STEP = 3;         // px between recorded vertices
+  const lassoD = () => `M${lasso.map((p) => p.join(",")).join("L")}Z`;
+  const clampToPlot = (event) => [Math.max(0, Math.min(width, event.x)), Math.max(0, Math.min(height, event.y))];
   svg.call(d3.drag()
     .container(svg.node())
     .filter((event) => (brushMode || event.shiftKey) && !event.button)
     .on("start", (event) => {
-      brushOrigin = [event.x, event.y];
+      lasso = [clampToPlot(event)];
       tooltip.hide();
     })
     .on("drag", (event) => {
-      const [x0, y0, x1, y1] = brushBox(event);
-      brushRect.style("display", null).attr("x", x0).attr("y", y0).attr("width", x1 - x0).attr("height", y1 - y0);
+      const p = clampToPlot(event);
+      const last = lasso[lasso.length - 1];
+      if (Math.hypot(p[0] - last[0], p[1] - last[1]) < LASSO_STEP) return;
+      lasso.push(p);
+      lassoPath.style("display", null).attr("d", lassoD());
     })
-    .on("end", (event) => {
-      brushRect.style("display", "none");
-      const [x0, y0, x1, y1] = brushBox(event);
-      if (x1 - x0 < 3 && y1 - y0 < 3) return; // a click, not a brush
-      const [a0, b0] = transform.invert([x0, y0]);
-      const [a1, b1] = transform.invert([x1, y1]);
+    .on("end", () => {
+      lassoPath.style("display", "none");
+      const [x0, x1] = d3.extent(lasso, (p) => p[0]);
+      const [y0, y1] = d3.extent(lasso, (p) => p[1]);
+      if (lasso.length < 3 || (x1 - x0 < 4 && y1 - y0 < 4)) return; // a click, not a brush
+      const polygon = lasso.map((p) => transform.invert(p));       // into base px, like the point positions
       const inside = ids.filter((id) => {
         // In the path view the visible marks are the trail ends, so those are brushed.
-        const [px, py] = paths.active ? paths.end(id) : [nodes.get(id).x, nodes.get(id).y];
-        return px >= a0 && px <= a1 && py >= b0 && py <= b1;
+        const point = paths.active ? paths.end(id) : [nodes.get(id).x, nodes.get(id).y];
+        return d3.polygonContains(polygon, point);
       });
+      lasso = [];
       store.set({ brushed: inside.length ? new Set(inside) : null }); // an empty brush clears itself (§9)
     }));
 
@@ -629,10 +633,12 @@ export function initScatter(container, { store, data, tools, overlay }) {
       row.delta.text("");
       return;
     }
+    // Signed change from the previous step (+0.06 / −0.04 / ±0.00). No ▲ ▼: triangles mean "misclassified".
     const delta = value - previous;
     const magnitude = format(Math.abs(delta)).replace(" %", "");
-    const arrow = Number(magnitude) === 0 ? "=" : delta > 0 ? "▲" : "▼"; // "=" when it rounds to zero
-    row.delta.text(`${arrow} ${magnitude}`);
+    const sign = Number(magnitude) === 0 ? "±" : delta > 0 ? "+" : "−"; // "±" when it rounds to zero
+    row.delta.text(`${sign}${magnitude}`)
+      .attr("title", "change from the previous step");
   }
 
   // ------------------------------------------------------------------ legend (depends on "Color by")
